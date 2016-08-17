@@ -386,18 +386,29 @@ def webservice_tijiao(requset):
 
 def webservice_yewubaijie(requset):#业务办结存入数据库
     if requset.method == 'POST':
-        jieshou_json = json.loads(requset.body)
+        #try:
+            #jieshou_json = json.loads(requset.body)
+        #except ValueError:
+
+
+        str1 = requset.body
+        start_index = str1.find('{')
+        end_index = str1.find('}') +1
+        jieshou_json = json.loads(str1[start_index:end_index])
+
+        #jieshou_json = json.loads(requset.body)
         paizhaohao = jieshou_json.get('paizhaohao')
         paizhaoleibie_id = jieshou_json.get('paizhaoleibie_id')
         xingshizheng_baocun = DX_Xingshizheng(paizhaohao=paizhaohao,cheliangleibie_id=paizhaoleibie_id,
                                               chuanjianriqi=datetime.datetime.now())
         xingshizheng_baocun.save()
+        print 'cunchu'
 
         car_info_chaxun = DX_CarInfo.objects.filter(paizhaohao__contains=paizhaohao,paizhaoleibie_id__contains=paizhaoleibie_id)
 
         if car_info_chaxun.exists():
             q = DX_FaSongMX(paizhaohao=paizhaohao, tijiao_datetime=datetime.datetime.now(), dianhuahao=car_info_chaxun[0].dianhua,
-                            yincheyuan_name=u'空', yincheyuan_dianhua=u'空', fasongjiekou='yewu_banjie',is_delete=True)
+                            yincheyuan_name=u'空', yincheyuan_dianhua=u'空', fasongjiekou='yewu_banjie',is_delete=False)
             q.save()
 
             qs = DX_Xingshizheng.objects.filter(paizhaohao=paizhaohao,cheliangleibie_id=paizhaoleibie_id).order_by('-chuanjianriqi')[0].id
@@ -418,7 +429,7 @@ def webservice_yewubaijie(requset):#业务办结存入数据库
 
 
 
-
+        print 'wancheng'
         return JsonResponse(result)
     else:
         result = {'zhuangtai': 'Error', 'fanhui_msg': u'出现错误500'}
