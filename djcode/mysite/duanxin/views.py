@@ -386,51 +386,44 @@ def webservice_tijiao(requset):
 
 def webservice_yewubaijie(requset):#业务办结存入数据库
     if requset.method == 'POST':
-        #try:
-            #jieshou_json = json.loads(requset.body)
-        #except ValueError:
-
-
         str1 = requset.body
         start_index = str1.find('{')
         end_index = str1.find('}') +1
         jieshou_json = json.loads(str1[start_index:end_index])
-
         #jieshou_json = json.loads(requset.body)
         paizhaohao = jieshou_json.get('paizhaohao')
         paizhaoleibie_id = jieshou_json.get('paizhaoleibie_id')
-        xingshizheng_baocun = DX_Xingshizheng(paizhaohao=paizhaohao,cheliangleibie_id=paizhaoleibie_id,
+
+        conn = pymssql.connect('172.18.130.3', 'sa', 'svrcomputer', 'NewGaJck_TB')
+        cursor = conn.cursor()
+        cursor.execute('SELECT COUNT (*) FROM ufee WHERE CPH=%s AND PZLBID=%s',(paizhaohao,paizhaoleibie_id))
+        qs_num = cursor.fetchall()[0][0]
+        if not isinstance(qs_num,int):
+            result = {'zhuangtai':'Error','zhuangtai_str':u'查询出现错误，请检查'}
+            conn.close()
+            return JsonResponse(result)
+        elif  qs_num == 0:
+            result = {'zhuangtai':'Error','zhuangtai_str':u'没有查询到该车辆对应收费信息,请核对后重新录入!'}
+            conn.close()
+            return JsonResponse(result)
+        else:
+            xingshizheng_baocun = DX_Xingshizheng(paizhaohao=paizhaohao,cheliangleibie_id=paizhaoleibie_id,
                                               chuanjianriqi=datetime.datetime.now())
-        xingshizheng_baocun.save()
-        print 'cunchu'
-
-        car_info_chaxun = DX_CarInfo.objects.filter(paizhaohao__contains=paizhaohao,paizhaoleibie_id__contains=paizhaoleibie_id)
-
-        if car_info_chaxun.exists():
-            q = DX_FaSongMX(paizhaohao=paizhaohao, tijiao_datetime=datetime.datetime.now(), dianhuahao=car_info_chaxun[0].dianhua,
+            xingshizheng_baocun.save()
+            car_info_chaxun = DX_CarInfo.objects.filter(paizhaohao__contains=paizhaohao,paizhaoleibie_id__contains=paizhaoleibie_id)
+            if car_info_chaxun.exists():
+                q = DX_FaSongMX(paizhaohao=paizhaohao, tijiao_datetime=datetime.datetime.now(), dianhuahao=car_info_chaxun[0].dianhua,
                             yincheyuan_name=u'空', yincheyuan_dianhua=u'空', fasongjiekou='yewu_banjie',is_delete=False)
-            q.save()
+                q.save()
 
-            qs = DX_Xingshizheng.objects.filter(paizhaohao=paizhaohao,cheliangleibie_id=paizhaoleibie_id).order_by('-chuanjianriqi')[0].id
+                qs = DX_Xingshizheng.objects.filter(paizhaohao=paizhaohao,cheliangleibie_id=paizhaoleibie_id).order_by('-chuanjianriqi')[0].id
 
-            qs_update = DX_Xingshizheng.objects.filter(id=qs)
+                qs_update = DX_Xingshizheng.objects.filter(id=qs)
 
-            qs_update.update(fasong_time=datetime.datetime.now())
-
-
-
-
-
-
-
-
-        result = {'zhuangtai':'Success','zhuangtai_str':u'成功'}
-        # return JsonResponse(result)
-
-
-
-        print 'wancheng'
-        return JsonResponse(result)
+                qs_update.update(fasong_time=datetime.datetime.now())
+            result = {'zhuangtai':'Success','zhuangtai_str':u'成功'}
+            conn.close()
+            return JsonResponse(result)
     else:
-        result = {'zhuangtai': 'Error', 'fanhui_msg': u'出现错误500'}
+        result = {'zhuangtai': 'Error', 'zhuangtai_str': u'出现错误500'}
         return JsonResponse(result)
