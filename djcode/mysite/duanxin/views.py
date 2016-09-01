@@ -386,27 +386,31 @@ def webservice_tijiao(requset):
 
 def webservice_yewubaijie(requset):#业务办结存入数据库
     if requset.method == 'POST':
-        str1 = requset.body
-        start_index = str1.find('{')
-        end_index = str1.find('}') +1
-        jieshou_json = json.loads(str1[start_index:end_index])
+        try:
+            jieshou_json = json.loads(requset.body)
+        except ValueError:
+            str1 = requset.body
+            start_index = str1.find('{')
+            end_index = str1.find('}') +1
+            jieshou_json = json.loads(str1[start_index:end_index])
         #jieshou_json = json.loads(requset.body)
         paizhaohao = jieshou_json.get('paizhaohao')
         paizhaoleibie_id = jieshou_json.get('paizhaoleibie_id')
-
-        conn = pymssql.connect('172.18.130.3', 'sa', 'svrcomputer', 'NewGaJck_TB')
-        cursor = conn.cursor()
-        cursor.execute('SELECT COUNT (*) FROM ufee WHERE CPH=%s AND PZLBID=%s',(paizhaohao,paizhaoleibie_id))
-        qs_num = cursor.fetchall()[0][0]
-        if not isinstance(qs_num,int):
-            result = {'zhuangtai':'Error','zhuangtai_str':u'查询出现错误，请检查'}
-            conn.close()
-            return JsonResponse(result)
-        elif  qs_num == 0:
-            result = {'zhuangtai':'Error','zhuangtai_str':u'没有查询到该车辆对应收费信息,请核对后重新录入!'}
-            conn.close()
-            return JsonResponse(result)
-        else:
+        panduan = shijianchuli(paizhaohao,paizhaoleibie_id)
+        if panduan.get('zhuangtai') == 'Success':
+        #conn = pymssql.connect('172.18.130.3', 'sa', 'svrcomputer', 'NewGaJck_TB')
+        #cursor = conn.cursor()
+        #cursor.execute('SELECT COUNT (*) FROM ufee WHERE CPH=%s AND PZLBID=%s',(paizhaohao,paizhaoleibie_id))
+        #qs_num = cursor.fetchall()[0][0]
+        #if not isinstance(qs_num,int):
+            #result = {'zhuangtai':'Error','zhuangtai_str':u'查询出现错误，请检查'}
+            #conn.close()
+            #return JsonResponse(result)
+        #elif  qs_num == 0:
+            #result = {'zhuangtai':'Error','zhuangtai_str':u'没有查询到该车辆对应收费信息,请核对后重新录入!'}
+            #conn.close()
+            #return JsonResponse(result)
+        #else:
             xingshizheng_baocun = DX_Xingshizheng(paizhaohao=paizhaohao,cheliangleibie_id=paizhaoleibie_id,
                                               chuanjianriqi=datetime.datetime.now())
             xingshizheng_baocun.save()
@@ -420,10 +424,44 @@ def webservice_yewubaijie(requset):#业务办结存入数据库
 
                 qs_update = DX_Xingshizheng.objects.filter(id=qs)
 
-                qs_update.update(fasong_time=datetime.datetime.now())
-            result = {'zhuangtai':'Success','zhuangtai_str':u'成功'}
-            conn.close()
-            return JsonResponse(result)
+                qs_update.update(fasong_time=datetime.datetime.now(),is_fasong=True)
+            #result = {'zhuangtai':'Success','zhuangtai_str':u'成功'}
+            return HttpResponse(panduan.get('zhuangtai_str'))
+        else:
+            #return JsonResponse(panduan,safe=True)
+            #return  HttpResponse(json.dumps(panduan), content_type='application/json')
+            return HttpResponse(panduan.get('zhuangtai_str'))
+
     else:
         result = {'zhuangtai': 'Error', 'zhuangtai_str': u'出现错误500'}
         return JsonResponse(result)
+
+
+def shijianchuli(paizhaohao,paizhaoleibie_id):
+    now = datetime.datetime.now()
+    #paizhaohao = u'蒙A18398'
+    #paizhaoleibie_id = '13'
+    jianyanleibie = u'在用机动车检验'
+    jieguo = []
+    jieguo_shuchu = []
+    shijiancha_yueding = datetime.timedelta(days=60)
+    conn = pymssql.connect('172.18.130.3', 'sa', 'svrcomputer', 'NewGaJck_TB')
+    cursor = conn.cursor(as_dict=True)
+    cursor.execute('SELECT * FROM ufee WHERE CPH=%s AND PZLBID=%s AND JCLB=%s',
+                   (paizhaohao, paizhaoleibie_id, jianyanleibie))
+
+    for i in cursor:
+        jieguo.append(i.get('SKRQ'))
+    conn.close()
+    if len(jieguo) == 0:
+        return {'zhuangtai':'Error','zhuangtai_str':u'0%该车辆没有收费记录,请检查输入的车牌号和牌照类别'}
+    else:
+        for q in jieguo:
+            shijiancha = now - q
+            if shijiancha < shijiancha_yueding:
+                jieguo_shuchu.append(shijiancha)
+        if len(jieguo_shuchu) == 0:
+            return {'zhuangtai':'Error','zhuangtai_str':u'0%该车辆收费日期与今天相差60天,请注意检查'}
+        else:
+            return {'zhuangtai':'Success','zhuangtai_str':u'1%成功'}
+
