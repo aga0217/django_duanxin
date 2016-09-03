@@ -84,6 +84,7 @@ class DX_Xingshizheng(models.Model):
 
     chuanjianriqi = models.DateTimeField(verbose_name=u'资料创建日期', auto_now_add=datetime.datetime.now())
     fasong_time = models.DateTimeField(verbose_name=u'发送时间',null=True)
+    is_del = models.BooleanField(verbose_name=u'是否删除', default=False)#是否删除
 
 
 

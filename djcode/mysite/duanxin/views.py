@@ -396,6 +396,16 @@ def webservice_yewubaijie(requset):#业务办结存入数据库
         #jieshou_json = json.loads(requset.body)
         paizhaohao = jieshou_json.get('paizhaohao')
         paizhaoleibie_id = jieshou_json.get('paizhaoleibie_id')
+        zhuangtai = jieshou_json.get('zhuangtai')
+        if zhuangtai == 'del':
+            qs = DX_Xingshizheng.objects.filter(is_del=False,paizhaohao=paizhaohao, cheliangleibie_id=paizhaoleibie_id).order_by(
+                '-chuanjianriqi')[0].id
+
+            qs_update = DX_Xingshizheng.objects.filter(id=qs)
+
+            qs_update.update(is_del=True)
+            return HttpResponse(u'1%成功')
+
         panduan = shijianchuli(paizhaohao,paizhaoleibie_id)
         if panduan.get('zhuangtai') == 'Success':
         #conn = pymssql.connect('172.18.130.3', 'sa', 'svrcomputer', 'NewGaJck_TB')
@@ -420,7 +430,7 @@ def webservice_yewubaijie(requset):#业务办结存入数据库
                             yincheyuan_name=u'空', yincheyuan_dianhua=u'空', fasongjiekou='yewu_banjie',is_delete=False)
                 q.save()
 
-                qs = DX_Xingshizheng.objects.filter(paizhaohao=paizhaohao,cheliangleibie_id=paizhaoleibie_id).order_by('-chuanjianriqi')[0].id
+                qs = DX_Xingshizheng.objects.filter(is_del=False,paizhaohao=paizhaohao,cheliangleibie_id=paizhaoleibie_id).order_by('-chuanjianriqi')[0].id
 
                 qs_update = DX_Xingshizheng.objects.filter(id=qs)
 
