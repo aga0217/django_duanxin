@@ -31,4 +31,19 @@ class DX_Fasongmxtable(Table):
         Link(text=u'重新发送', viewname='kucuntest.views.JP_JpMX_new_edit', args=(A('id'), )),
     ])
 
+class DX_ZhiZheng_chaxun_table(Table):
+	paizhaohao =  Column(field='paizhaohao',header=u'车牌号')
+	cheliangleibie_id=  Column(field='cheliangleibie_id',header=u'车辆类型')
+	zhizheng_datetime =  DatetimeColumn(field='chuanjianriqi',header=u'制证日期',format="%Y-%m-%d %H:%I:%S")
 
+class DX_ShouFei_chaxun_table(Table):
+	paizhaohao =  Column(field='CPH',header=u'车牌号')
+	cheliangleibie_id=  Column(field='PZLBID',header=u'车辆类型')
+	zhizheng_datetime =  DatetimeColumn(field='SKRQ',header=u'收费日期',format="%Y-%m-%d %H:%I:%S")
+
+
+class DX_ShouFei_ZhiZheng_duibi_table(Table):
+	paizhaohao =  Column(field='CPH',header=u'车牌号')
+	cheliangleibie_id=  Column(field='PZLBID',header=u'车辆类型')
+	zhizheng_datetime =  DatetimeColumn(field='ZZRQ',header=u'制证日期',format="%Y-%m-%d %H:%I:%S")
+	shoufei_datetime = DatetimeColumn(field='SKRQ', header=u'收费日期', format="%Y-%m-%d %H:%I:%S")

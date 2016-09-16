@@ -27,7 +27,7 @@ from xlrd import open_workbook
 from xlwt import Workbook
 from xlutils.copy import copy
 import xlsxwriter
-
+import time
 import pandas as pd
 from django.views.generic import (
     CreateView,
@@ -251,23 +251,6 @@ def Dx_zonghechaxun_carinfo(request):
             cheliang_leixing = form.cleaned_data['cheliangleixing']
             if not cheliang_leixing == None:
         """
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
         return render_to_response('test1.html', locals(), context_instance=RequestContext(request))
     else:
             form = DX_search_carinfo_forms()
@@ -397,7 +380,7 @@ def webservice_yewubaijie(requset):#业务办结存入数据库
         paizhaohao = jieshou_json.get('paizhaohao')
         paizhaoleibie_id = jieshou_json.get('paizhaoleibie_id')
         zhuangtai = jieshou_json.get('zhuangtai')
-        if zhuangtai == 'del':
+        if zhuangtai == 'del':#t处理状态变更时的数据删除
             qs = DX_Xingshizheng.objects.filter(is_del=False,paizhaohao=paizhaohao, cheliangleibie_id=paizhaoleibie_id).order_by(
                 '-chuanjianriqi')[0].id
 
@@ -474,4 +457,219 @@ def shijianchuli(paizhaohao,paizhaoleibie_id):
             return {'zhuangtai':'Error','zhuangtai_str':u'0%该车辆收费日期与今天相差60天,请注意检查'}
         else:
             return {'zhuangtai':'Success','zhuangtai_str':u'1%成功'}
+
+def Dx_shoufeizhizheng_chaxun(request):
+    #jiaxiaolist = jiaxiaolist_test()
+    #todayshuju = todayshuju_dic()
+    title = u'综合查询测试'
+    download = False
+    listleibie = 'datatable'
+    addleibie = 'churuku'
+    #jieyu = ''
+    fangshi = ''
+
+    if request.method == 'POST':
+        form = DX_chaxun_duibi_forms(request.POST)
+        if form.is_valid():
+            chaxun_or_duibi = form.cleaned_data['chaxun_or_duibi']
+            #mxorhuizong = form.cleaned_data['mxorhuizong']
+            start_time = form.cleaned_data['start_time']
+            end_time = form.cleaned_data['end_time']
+            shuchufangshi = form.cleaned_data['shuchufangshi']
+            shengchengwenjian = form.cleaned_data['shengchengwenjian']
+            kwargs = {}
+            agve = {}
+            path = None
+            download = None
+
+            is_sum = False
+
+            if start_time or end_time is not None:
+                if start_time is not None and end_time is None:
+                    agve['chuanjianriqi__gte']=start_time
+                    if end_time is not None:
+                         agve['chuanjianriqi__lte']=end_time
+            if start_time and end_time is not None:
+                agve['chuanjianriqi__range'] = (start_time,end_time)
+            if chaxun_or_duibi == 'shoufei':
+
+                data = shoufei_chaxun_sql(start_time,end_time)
+                #pd_dic = pd.DataFrame(data).to_dict('recode')
+                for i in data:
+                    i['PZLBID'] = cheliangleixingInt_cheliaangleixing_UTF8(i.get('PZLBID'))
+                jieguo = DX_ShouFei_chaxun_table(data)
+
+                #jieguo = DX_ShouFei_chaxun_table(data)
+            elif chaxun_or_duibi == 'zhizheng':
+                data =  pd.DataFrame(list(DX_Xingshizheng.objects.filter(is_del=False).filter(**agve).order_by('chuanjianriqi').values('paizhaohao',
+                               'cheliangleibie_id','chuanjianriqi'))).to_dict('recode')
+                for i in data:
+                    i['cheliangleibie_id'] = cheliangleixingInt_cheliaangleixing_UTF8(i.get('cheliangleibie_id'))
+                jieguo = DX_ZhiZheng_chaxun_table(data)
+                #print data #输出的字典中时间为时间戳,需转换
+            elif chaxun_or_duibi == 'shoufei_zhizheng_duibi':
+                shoufei_list = shoufei_chaxun_sql(start_time,end_time)
+                shoufei_df = pd.DataFrame(shoufei_list)
+                zhizheng_list = list(DX_Xingshizheng.objects.filter(is_del=False).filter(**agve).order_by('chuanjianriqi').values('paizhaohao',
+                                'cheliangleibie_id','chuanjianriqi'))
+                zhizheng_list_pd = []
+                for i in zhizheng_list:
+                    list_dic = {}
+                    list_dic['CPH'] = i.get('paizhaohao')
+                    list_dic['PZLBID'] = i.get('cheliangleibie_id')
+                    list_dic['ZZRQ'] = i.get('chuanjianriqi')
+                    zhizheng_list_pd.append(list_dic)
+                zhizheng_df = pd.DataFrame(zhizheng_list_pd)
+                jieguo_df = pd.merge(shoufei_df, zhizheng_df, on=['CPH', 'PZLBID'], how='outer')
+                if shuchufangshi == 'all':
+                    listleibie = 'shoufei_zhizheng_duibi'
+                    jieguo_fanhui = chuliduibijieguo_shuchu(jieguo_df,shuchufangshi)
+                    jieguo = jieguo_fanhui[0]
+                    yichang = jieguo_fanhui[1]
+                    zongshu = jieguo_fanhui[2]
+                    if shengchengwenjian == 'yes':
+                        download = True
+                        path = jieguo_to_excel(jieguo,chaxun_or_duibi)
+                if shuchufangshi == 'chayi':
+                    listleibie = 'shoufei_zhizheng_duibi'
+                    jieguo_fanhui = chuliduibijieguo_shuchu(jieguo_df,shuchufangshi)
+                    jieguo = jieguo_fanhui[0]
+                    yichang = jieguo_fanhui[1]
+                    zongshu = jieguo_fanhui[2]
+                    if shengchengwenjian == 'yes':
+                        download = True
+                        path = jieguo_to_excel(jieguo,chaxun_or_duibi)
+
+
+
+
+
+
+
+
+            """
+            df_copy = pd.DataFrame(list(JpMX_new.objects.filter(isdelete=False).filter(**agve).order_by('riqi').values(
+				'jiaxiaoname_str','riqi','gouka','shouquan','dandugoumai_shuliang','tushu_yingling_shuliang','tushu_shiling_shuliang','is_tushu_qichushu')))
+            if mxorhuizong == 'mx':
+                 data = JP_tohtml(df,fafangorshouquan,mxorhuizong)
+            if mxorhuizong == 'jiaxiaoname':
+                listleibie = 'datatable_pandas'
+                jieguo_dic = JP_tohtml(df,fafangorshouquan,mxorhuizong)
+                if fafangorshouquan =='fafang':
+                    jieguo = JP_zonghechaxun_gouka_huizong_table(jieguo_dic.get('jieguo'))
+                if fafangorshouquan =='shouquan':
+                    jieguo = JP_zonghechaxun_shouquan_huizong_table(jieguo_dic.get('jieguo'))
+                if fafangorshouquan == 'jiaocai':
+                    jieguo = JP_zonghechaxun_jiaocai_huizong_table(jieguo_dic.get('jieguo'))
+            """
+
+            #if shengchengwenjian == 'yes':
+                #path = JPexcel(df_copy,fafangorshouquan,mxorhuizong,agve)
+
+            return render_to_response('bglist.html', locals(), context_instance=RequestContext(request))
+    else:
+        form = DX_chaxun_duibi_forms()
+    return render_to_response('bgadd.html', locals(), context_instance=RequestContext(request))
+
+def shoufei_chaxun_sql(start_time,end_time):#查询区间收费信息
+    conn = pymssql.connect('172.18.130.3', 'sa', 'svrcomputer', 'NewGaJck_TB')
+    cursor = conn.cursor(as_dict=True)
+    if start_time is None:
+        start_time = datetime.date(1900,1,1)
+    if end_time is None:
+        end_time = datetime.date.today() + datetime.timedelta(days = 1)
+    else:
+        end_time = end_time + datetime.timedelta(days = 1)
+    #print start_time,end_time
+    jianyanleibie = u'在用机动车检验'
+    cursor.execute('SELECT * FROM ufee WHERE SKRQ>%s AND SKRQ<%s AND JCLB=%s', (start_time,end_time, jianyanleibie))
+    shoufeiliebiao = []
+    for i in cursor:
+        dic = {}
+        dic['CPH'] = i.get('CPH')
+        dic['PZLBID'] = i.get('PZLBID')
+        dic['SKRQ'] = i.get('SKRQ')
+        shoufeiliebiao.append(dic)
+    conn.close()
+    return shoufeiliebiao
+def shoufei_cheliang_chaxun_sql(CPH,PZLBID):#查询车辆收费信息
+    conn = pymssql.connect('172.18.130.3', 'sa', 'svrcomputer', 'NewGaJck_TB')
+    cursor = conn.cursor(as_dict=True)
+    jianyanleibie = u'在用机动车检验'
+    cursor.execute('SELECT * FROM ufee WHERE CPH=%s AND PZLBID=%s AND JCLB=%s', (CPH, PZLBID, jianyanleibie))
+    shoufeileibiao = []
+    for i in cursor:
+        shoufeileibiao.append(i.get('SKRQ'))
+    conn.close()
+    if len(shoufeileibiao) == 0:
+        return u'车辆没有找到收费记录'
+    else:
+        return datetime.datetime.strftime(shoufeileibiao[-1], "%Y-%m-%d %H:%M:%S")
+
+
+def chuliduibijieguo_yanse_xuhao(jieguo_pd):#为结果添加序号和颜色代码
+    jieguo_return = []
+    xuhao = 0
+    yichang = 0
+    for i in jieguo_pd:
+        xuhao = xuhao+1
+        dic = {}
+        dic['CPH'] = i.get('CPH')
+        dic['PZLBID'] = cheliangleixingInt_cheliaangleixing_UTF8(i.get('PZLBID'))
+        if i.get('SKRQ') == datetime.datetime(1970,1,1 ,0,0,0,0):
+            dic['SKRQ'] = shoufei_cheliang_chaxun_sql(i.get('CPH'),i.get('PZLBID'))
+            yichang = yichang +1
+        else:
+            dic['SKRQ'] = datetime.datetime.strftime(i.get('SKRQ'),"%Y-%m-%d %H:%M:%S")
+        if i.get('ZZRQ') == datetime.datetime(1970,1,1,0,0,0,0):
+            dic['ZZRQ'] = ''
+            yichang = yichang +1
+        else:
+            dic['ZZRQ'] = datetime.datetime.strftime(i.get('ZZRQ'),"%Y-%m-%d %H:%M:%S")
+        dic['xuhao'] = xuhao
+        if i.get('SKRQ') == datetime.datetime(1970,1,1 ,0,0,0,0):
+            dic['yanse'] = 'red'
+        if i.get('ZZRQ') == datetime.datetime(1970,1,1 ,0,0,0,0):
+            dic['yanse'] = 'blue'
+        jieguo_return.append(dic)
+    zongshu = len(jieguo_return)
+    return jieguo_return,yichang,zongshu
+
+
+def chuliduibijieguo_shuchu(jieguo_pd,shuchufangshi):#控制结果输出方式
+    if shuchufangshi == 'all':
+        jieguo = chuliduibijieguo_yanse_xuhao(jieguo_pd.fillna(0).to_dict('recode'))
+        return jieguo
+    if shuchufangshi == 'chayi':
+        jieguo_shaixuan = jieguo_pd[jieguo_pd.SKRQ.isnull()|jieguo_pd.ZZRQ.isnull()]
+        jieguo = chuliduibijieguo_yanse_xuhao(jieguo_shaixuan.fillna(0).to_dict('recode'))
+        return jieguo
+
+def cheliangleixingInt_cheliaangleixing_UTF8(cheliangleixingInt):
+
+    dic = {'02':u'小型汽车','01':u'大型汽车','03':u'使馆汽车','04':u'领馆汽车','05':u'境外汽车',
+           '15':u'挂车','13':u'农用运输车','14':u'拖拉机','17':u'教练摩托车','23':u'警用汽车',
+           '07':u'两、三轮摩托','06':u'外籍汽车','08':u'轻便摩托车','16':u'教练汽车','24':u'警用摩托车'}
+
+    return dic[cheliangleixingInt]
+#TODO:完成表格输出
+def jieguo_to_excel(jieguo_df,chaxun_or_duibi):
+    temp_name = str(
+    datetime.date.today().strftime("%Y%m%d") + str(random.randint(1, 10000)))
+    path = settings.MEDIA_ROOT + "/file/%s.xls" % temp_name
+    path_return = "/media/file/%s.xls" % temp_name
+    print path_return
+    if chaxun_or_duibi == 'shoufei_zhizheng_duibi':
+        df = pd.DataFrame(jieguo_df)
+        del df['xuhao']
+        del df['yanse']
+        df.columns = ['车牌号', '牌照类别', '收款日期','制证日期']
+        writer = pd.ExcelWriter(path, engine='openpyxl', date_format='mmm d yyyy')
+        df.to_excel(writer, sheet_name='Sheet1')
+        workbook = writer.book
+        worksheet = writer.sheets['Sheet1']
+        # worksheet.set_column('A:A', 20)
+        writer.save()
+    return path_return
+
 
