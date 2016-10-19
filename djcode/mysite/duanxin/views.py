@@ -62,7 +62,6 @@ def tijiao(request):
 	erbuyanzhengneirong = u'确认提交吗？'
 	tishixinxi = u'现在操作的是：%s，请小心操作！' % (title)
 	#caozuo_user = request.user.username
-	#JpMX_new_id = JpMX_new.objects.filter(jiaxiaoname=jiaxiaoid) #TODO:使用函数提供各种数据
 	if request.method == 'POST':
 		form = DX_tijiao_form(request.POST)
 		if form.is_valid():
@@ -437,7 +436,7 @@ def shijianchuli(paizhaohao,paizhaoleibie_id):
     jianyanleibie = u'在用机动车检验'
     jieguo = []
     jieguo_shuchu = []
-    shijiancha_yueding = datetime.timedelta(days=60)
+    shijiancha_yueding = datetime.timedelta(days=91)
     conn = pymssql.connect('172.18.130.3', 'sa', 'svrcomputer', 'NewGaJck_TB')
     cursor = conn.cursor(as_dict=True)
     cursor.execute('SELECT * FROM ufee WHERE CPH=%s AND PZLBID=%s AND JCLB=%s',
@@ -652,7 +651,7 @@ def cheliangleixingInt_cheliaangleixing_UTF8(cheliangleixingInt):
            '07':u'两、三轮摩托','06':u'外籍汽车','08':u'轻便摩托车','16':u'教练汽车','24':u'警用摩托车'}
 
     return dic[cheliangleixingInt]
-#TODO:完成表格输出
+#
 def jieguo_to_excel(jieguo_df,chaxun_or_duibi):
     temp_name = str(
     datetime.date.today().strftime("%Y%m%d") + str(random.randint(1, 10000)))
@@ -672,4 +671,62 @@ def jieguo_to_excel(jieguo_df,chaxun_or_duibi):
         writer.save()
     return path_return
 
+def webservice_weiqishofuei_chaxun(requset):
+    if requset.method == 'POST':
+        try:
+            jieshou_json = json.loads(requset.body)
+        except ValueError:
+            str1 = requset.body
+            start_index = str1.find('{')
+            end_index = str1.find('}') +1
+            jieshou_json = json.loads(str1[start_index:end_index])
+        #jieshou_json = json.loads(requset.body)
+        shijiancha_yueding = datetime.timedelta(days=91)
+        now = datetime.datetime.now()
+        paizhaohao = jieshou_json.get('paizhaohao')
+        paizhaoleibie_id = jieshou_json.get('paizhaoleibie_id')
+        paichuliebiao = ['01','02','03','04','05','06','13','16','23']#列表中为需要检测尾气的车型
+        if paizhaoleibie_id not in paichuliebiao:#判断类型是否在排除列表中
+            result = {'is_tixing':'no'}
+            return JsonResponse(result)
+
+
+        conn = pymssql.connect('172.18.130.3', 'sa', 'svrcomputer', 'NewGaJck_TB')
+        cursor = conn.cursor(as_dict=True)
+        cursor.execute('SELECT SYXZID FROM carinfo WHERE AutoID = (SELECT MAX(AutoID) FROM carinfo WHERE CPH = %s AND PZLBID = %s)',
+                        (paizhaohao, paizhaoleibie_id))
+        cheliangxinxi = {}
+        try:
+            cheliangxinxi['yingyunleibie_id'] = cursor.fetchall()[0].get('SYXZID')
+        except:
+            pass
+        conn.close()
+        if len(cheliangxinxi) == 0:
+            return JsonResponse({'is_tixing':'yes','tixingxinxi':u'没有找到车辆的年检信息，是否继续？'})
+
+        if cheliangxinxi.get('yingyunleibie_id') == 'D':
+            result = {'is_tixing': 'no'}  # 界面是否需要提醒没有尾气收费
+            return JsonResponse(result)
+        #查询尾气收费
+        jieguo = {}
+        conn1 = pymssql.connect('172.18.130.50', 'sa', 'svrcomputer', 'hbjcdb')
+        cursor1 = conn1.cursor(as_dict=True)
+        cursor1.execute('SELECT SKRQ,SKJE FROM ufee WHERE FPHM = (SELECT MAX(FPHM) FROM ufee WHERE CPH = %s AND PZLBID = %s)',
+                        (paizhaohao, paizhaoleibie_id))
+        for i in cursor1.fetchall():
+            try:
+                jieguo['SKRQ'] = i.get('SKRQ')
+                jieguo['SKJE'] = i.get('SKJE')
+            except:
+                pass
+        conn1.close()
+        if len(jieguo) == 0:
+            return JsonResponse({'is_tixing': 'yes','tixingxinxi':u'没有找到该车的尾气收费信息，是否继续？'})
+        if now - jieguo.get('SKRQ') < shijiancha_yueding and jieguo.get('SKJE') > 0 :
+            return JsonResponse({'is_tixing':'no'})
+        else:
+            return JsonResponse({'is_tixing':'yes','tixingxinxi':u'该车90天内没有缴费记录或缴费金额小于0，是否继续？'})
+    else:
+        result = {'zhuangtai': 'Error', 'fanhui_msg': u'出现错误500'}
+        return JsonResponse(result)
 
