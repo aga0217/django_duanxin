@@ -379,6 +379,7 @@ def webservice_yewubaijie(requset):#业务办结存入数据库
         paizhaohao = jieshou_json.get('paizhaohao')
         paizhaoleibie_id = jieshou_json.get('paizhaoleibie_id')
         zhuangtai = jieshou_json.get('zhuangtai')
+        NetxTime = ''.join(jieshou_json.get('nexttime').split('-')[:6])#  将2016-10-31这样的格式转化为201610
         if zhuangtai == 'del':#t处理状态变更时的数据删除
             qs = DX_Xingshizheng.objects.filter(is_del=False,paizhaohao=paizhaohao, cheliangleibie_id=paizhaoleibie_id).order_by(
                 '-chuanjianriqi')[0].id
@@ -404,7 +405,7 @@ def webservice_yewubaijie(requset):#业务办结存入数据库
             #return JsonResponse(result)
         #else:
             xingshizheng_baocun = DX_Xingshizheng(paizhaohao=paizhaohao,cheliangleibie_id=paizhaoleibie_id,
-                                              chuanjianriqi=datetime.datetime.now())
+                                              chuanjianriqi=datetime.datetime.now(),nexttime=NetxTime)
             xingshizheng_baocun.save()
             car_info_chaxun = DX_CarInfo.objects.filter(paizhaohao__contains=paizhaohao,paizhaoleibie_id__contains=paizhaoleibie_id)
             if car_info_chaxun.exists():
@@ -417,6 +418,8 @@ def webservice_yewubaijie(requset):#业务办结存入数据库
                 qs_update = DX_Xingshizheng.objects.filter(id=qs)
 
                 qs_update.update(fasong_time=datetime.datetime.now(),is_fasong=True)
+                qs_update_carinfo = DX_CarInfo.objects.filter(id = car_info_chaxun[0].id)
+                qs_update_carinfo.update(next_riqi=NetxTime)
             #result = {'zhuangtai':'Success','zhuangtai_str':u'成功'}
             return HttpResponse(panduan.get('zhuangtai_str'))
         else:
@@ -453,7 +456,7 @@ def shijianchuli(paizhaohao,paizhaoleibie_id):
             if shijiancha < shijiancha_yueding:
                 jieguo_shuchu.append(shijiancha)
         if len(jieguo_shuchu) == 0:
-            return {'zhuangtai':'Error','zhuangtai_str':u'0%该车辆收费日期与今天相差60天,请注意检查'}
+            return {'zhuangtai':'Error','zhuangtai_str':u'0%该车辆收费日期与今天相差90天,请注意检查'}
         else:
             return {'zhuangtai':'Success','zhuangtai_str':u'1%成功'}
 
@@ -711,8 +714,8 @@ def webservice_weiqishofuei_chaxun(requset):
         jieguo = {}
         conn1 = pymssql.connect('172.18.130.50', 'sa', 'svrcomputer', 'hbjcdb')
         cursor1 = conn1.cursor(as_dict=True)
-        cursor1.execute('SELECT SKRQ,SKJE FROM ufee WHERE FPHM = (SELECT MAX(FPHM) FROM ufee WHERE CPH = %s AND PZLBID = %s)',
-                        (paizhaohao, paizhaoleibie_id))
+        cursor1.execute('SELECT SKRQ,SKJE FROM ufee WHERE FPHM = (SELECT MAX(FPHM) FROM ufee WHERE CPH = %s )',
+                        (paizhaohao))
         for i in cursor1.fetchall():
             try:
                 jieguo['SKRQ'] = i.get('SKRQ')
