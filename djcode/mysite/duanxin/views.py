@@ -49,6 +49,7 @@ from django.core.files.base import ContentFile
 from PIL import ImageFile as PILImageFile
 import re
 import pymssql
+import pyodbc
 
 def tijiao(request):
 	#global jiaxiaoidglobal
@@ -269,7 +270,7 @@ def webservice_weiqi_chaxun(requset):
         #paizhaohao = u'\u8499AS7193'
         #result = {'zhuangtai':'Success','fanhui_msg':'chenggong'}
         #return JsonResponse(result)
-        conn1 = pymssql.connect('172.18.130.50', 'sa', 'svrcomputer', 'hbjcdb')
+        conn1 = pymssql.connect('15.29.32.61', 'sa', 'svrcomputer', 'hbjcdb')
         cursor1 = conn1.cursor()
         cursor1.execute('SELECT COUNT (*) FROM carinfo WHERE Car_CPH=%s',paizhaohao)
         qs_num1 = cursor1.fetchall()[0][0]
@@ -279,7 +280,7 @@ def webservice_weiqi_chaxun(requset):
         conn1.close()
 
 
-        conn = pymssql.connect('172.18.130.3', 'sa', 'svrcomputer', 'NewGaJck_TB')
+        conn = pymssql.connect('15.29.32.3', 'sa', 'svrcomputer', 'NewGaJck_TB')
         #conn = pymssql.connect('192.168.0.42', 'sa', 'svrcomputer', 'NewGaJck_TB')
         cursor = conn.cursor()
         cursor.execute('SELECT COUNT (*) FROM carinfo WHERE CPH=%s',paizhaohao)
@@ -376,10 +377,14 @@ def webservice_yewubaijie(requset):#业务办结存入数据库
             end_index = str1.find('}') +1
             jieshou_json = json.loads(str1[start_index:end_index])
         #jieshou_json = json.loads(requset.body)
-        paizhaohao = jieshou_json.get('paizhaohao')
-        paizhaoleibie_id = jieshou_json.get('paizhaoleibie_id')
+        paizhaohao = jieshou_json.get('paizhaohao').replace(' ','')
+        paizhaoleibie_id = jieshou_json.get('paizhaoleibie_id').replace(' ','')
         zhuangtai = jieshou_json.get('zhuangtai')
-        NetxTime = ''.join(jieshou_json.get('nexttime').split('-')[:6])#  将2016-10-31这样的格式转化为201610
+        try:
+            NetxTime = ''.join(jieshou_json.get('nexttime').replace(' ','').split('-'))[:6]#  将2016-10-31这样的格式转化为201610
+        except:
+            return HttpResponse(u'0%没有获取到车辆的下次检验日期，请重新运行。')
+
         if zhuangtai == 'del':#t处理状态变更时的数据删除
             qs = DX_Xingshizheng.objects.filter(is_del=False,paizhaohao=paizhaohao, cheliangleibie_id=paizhaoleibie_id).order_by(
                 '-chuanjianriqi')[0].id
@@ -391,7 +396,7 @@ def webservice_yewubaijie(requset):#业务办结存入数据库
 
         panduan = shijianchuli(paizhaohao,paizhaoleibie_id)
         if panduan.get('zhuangtai') == 'Success':
-        #conn = pymssql.connect('172.18.130.3', 'sa', 'svrcomputer', 'NewGaJck_TB')
+        #conn = pymssql.connect('15.29.32.3', 'sa', 'svrcomputer', 'NewGaJck_TB')
         #cursor = conn.cursor()
         #cursor.execute('SELECT COUNT (*) FROM ufee WHERE CPH=%s AND PZLBID=%s',(paizhaohao,paizhaoleibie_id))
         #qs_num = cursor.fetchall()[0][0]
@@ -419,7 +424,7 @@ def webservice_yewubaijie(requset):#业务办结存入数据库
 
                 qs_update.update(fasong_time=datetime.datetime.now(),is_fasong=True)
                 qs_update_carinfo = DX_CarInfo.objects.filter(id = car_info_chaxun[0].id)
-                qs_update_carinfo.update(next_riqi=NetxTime)
+                qs_update_carinfo.update(next_riqi=NetxTime,editriqi=datetime.datetime.now())
             #result = {'zhuangtai':'Success','zhuangtai_str':u'成功'}
             return HttpResponse(panduan.get('zhuangtai_str'))
         else:
@@ -440,7 +445,14 @@ def shijianchuli(paizhaohao,paizhaoleibie_id):
     jieguo = []
     jieguo_shuchu = []
     shijiancha_yueding = datetime.timedelta(days=91)
-    conn = pymssql.connect('172.18.130.3', 'sa', 'svrcomputer', 'NewGaJck_TB')
+    #处理重复录入的车辆信息
+    qs = DX_Xingshizheng.objects.filter(paizhaohao__contains=paizhaohao,cheliangleibie_id__contains=paizhaoleibie_id).order_by('-chuanjianriqi')
+    if len(qs) != 0:
+        chuangjianriqi = qs[0].chuanjianriqi
+        shijiancha = now - chuangjianriqi
+        if shijiancha < datetime.timedelta(days=15):
+            return {'zhuangtai':'Error','zhuangtai_str':u'该车15天内已经录入请检查！'}
+    conn = pymssql.connect('15.29.32.3', 'sa', 'svrcomputer', 'NewGaJck_TB')
     cursor = conn.cursor(as_dict=True)
     cursor.execute('SELECT * FROM ufee WHERE CPH=%s AND PZLBID=%s AND JCLB=%s',
                    (paizhaohao, paizhaoleibie_id, jianyanleibie))
@@ -449,21 +461,21 @@ def shijianchuli(paizhaohao,paizhaoleibie_id):
         jieguo.append(i.get('SKRQ'))
     conn.close()
     if len(jieguo) == 0:
-        return {'zhuangtai':'Error','zhuangtai_str':u'0%该车辆没有收费记录,请检查输入的车牌号和牌照类别'}
+        return {'zhuangtai':'Error','zhuangtai_str':u'0%该车辆没有收费记录（年检）,请检查输入的车牌号和牌照类别'}
     else:
         for q in jieguo:
             shijiancha = now - q
             if shijiancha < shijiancha_yueding:
                 jieguo_shuchu.append(shijiancha)
         if len(jieguo_shuchu) == 0:
-            return {'zhuangtai':'Error','zhuangtai_str':u'0%该车辆收费日期与今天相差90天,请注意检查'}
+            return {'zhuangtai':'Error','zhuangtai_str':u'0%该车辆收费日期（年检）与今天相差90天,请注意检查'}
         else:
             return {'zhuangtai':'Success','zhuangtai_str':u'1%成功'}
 
 def Dx_shoufeizhizheng_chaxun(request):
     #jiaxiaolist = jiaxiaolist_test()
     #todayshuju = todayshuju_dic()
-    title = u'综合查询测试'
+    title = u'收费制证对比查询'
     download = False
     listleibie = 'datatable'
     addleibie = 'churuku'
@@ -574,7 +586,7 @@ def Dx_shoufeizhizheng_chaxun(request):
     return render_to_response('bgadd.html', locals(), context_instance=RequestContext(request))
 
 def shoufei_chaxun_sql(start_time,end_time):#查询区间收费信息
-    conn = pymssql.connect('172.18.130.3', 'sa', 'svrcomputer', 'NewGaJck_TB')
+    conn = pymssql.connect('15.29.32.3', 'sa', 'svrcomputer', 'NewGaJck_TB')
     cursor = conn.cursor(as_dict=True)
     if start_time is None:
         start_time = datetime.date(1900,1,1)
@@ -595,7 +607,7 @@ def shoufei_chaxun_sql(start_time,end_time):#查询区间收费信息
     conn.close()
     return shoufeiliebiao
 def shoufei_cheliang_chaxun_sql(CPH,PZLBID):#查询车辆收费信息
-    conn = pymssql.connect('172.18.130.3', 'sa', 'svrcomputer', 'NewGaJck_TB')
+    conn = pymssql.connect('15.29.32.3', 'sa', 'svrcomputer', 'NewGaJck_TB')
     cursor = conn.cursor(as_dict=True)
     jianyanleibie = u'在用机动车检验'
     cursor.execute('SELECT * FROM ufee WHERE CPH=%s AND PZLBID=%s AND JCLB=%s', (CPH, PZLBID, jianyanleibie))
@@ -688,19 +700,22 @@ def webservice_weiqishofuei_chaxun(requset):
         now = datetime.datetime.now()
         paizhaohao = jieshou_json.get('paizhaohao')
         paizhaoleibie_id = jieshou_json.get('paizhaoleibie_id')
-        paichuliebiao = ['01','02','03','04','05','06','13','16','23']#列表中为需要检测尾气的车型
+        paichuliebiao = ['01','02','03','04','05','06','16','23','13']#列表中为需要检测尾气的车型
         if paizhaoleibie_id not in paichuliebiao:#判断类型是否在排除列表中
             result = {'is_tixing':'no'}
             return JsonResponse(result)
 
 
-        conn = pymssql.connect('172.18.130.3', 'sa', 'svrcomputer', 'NewGaJck_TB')
+        conn = pymssql.connect('15.29.32.3', 'sa', 'svrcomputer', 'NewGaJck_TB')
         cursor = conn.cursor(as_dict=True)
-        cursor.execute('SELECT SYXZID FROM carinfo WHERE AutoID = (SELECT MAX(AutoID) FROM carinfo WHERE CPH = %s AND PZLBID = %s)',
+        cursor.execute('SELECT SYXZID,CLLBXID FROM carinfo WHERE AutoID = (SELECT MAX(AutoID) FROM carinfo WHERE CPH = %s AND PZLBID = %s)',
                         (paizhaohao, paizhaoleibie_id))
         cheliangxinxi = {}
         try:
-            cheliangxinxi['yingyunleibie_id'] = cursor.fetchall()[0].get('SYXZID')
+            chaxunjieguo = cursor.fetchall()[0]
+            cheliangxinxi['yingyunleibie_id'] = chaxunjieguo.get('SYXZID')
+            cheliangxinxi['cheliangleibie_id'] = chaxunjieguo.get('CLLBXID')
+
         except:
             pass
         conn.close()
@@ -710,9 +725,12 @@ def webservice_weiqishofuei_chaxun(requset):
         if cheliangxinxi.get('yingyunleibie_id') == 'D':
             result = {'is_tixing': 'no'}  # 界面是否需要提醒没有尾气收费
             return JsonResponse(result)
+        if cheliangxinxi.get('cheliangleibie_id') == 'N11':
+            result = {'is_tixing': 'no'}
+            return JsonResponse(result)
         #查询尾气收费
         jieguo = {}
-        conn1 = pymssql.connect('172.18.130.50', 'sa', 'svrcomputer', 'hbjcdb')
+        conn1 = pymssql.connect('15.29.32.61', 'sa', 'svrcomputer', 'hbjcdb')
         cursor1 = conn1.cursor(as_dict=True)
         cursor1.execute('SELECT SKRQ,SKJE FROM ufee WHERE FPHM = (SELECT MAX(FPHM) FROM ufee WHERE CPH = %s )',
                         (paizhaohao))
@@ -728,8 +746,141 @@ def webservice_weiqishofuei_chaxun(requset):
         if now - jieguo.get('SKRQ') < shijiancha_yueding and jieguo.get('SKJE') > 0 :
             return JsonResponse({'is_tixing':'no'})
         else:
-            return JsonResponse({'is_tixing':'yes','tixingxinxi':u'该车90天内没有缴费记录或缴费金额小于0，是否继续？'})
+            return JsonResponse({'is_tixing':'yes','tixingxinxi':u'该车90天内没有缴费记录或缴费金额小于0（尾气），是否继续？'})
     else:
         result = {'zhuangtai': 'Error', 'fanhui_msg': u'出现错误500'}
         return JsonResponse(result)
 
+def webservice_shoufei(requset):#业务办结存入数据库
+    if requset.method == 'POST':
+        #验证IP地址
+        try:
+            ip =requset.META['REMOTE_ADDR']
+        except:
+            return HttpResponse(u'访问地址不匹配01')
+        ip_yunxu = ['116.113.44.166','192.168.0.1','106.35.156.193','111.126.133.172']
+        if ip not in ip_yunxu:
+            return HttpResponse(u'%s访问地址不匹配02' % ip)
+        #处理json
+        try:
+            jieshou_json = json.loads(requset.body)
+        except ValueError:
+            return HttpResponse(u'数据格式不对')
+        jieshou_json_str = str(jieshou_json)
+        jieshou_datetime = datetime.datetime.now()
+        jczid = jieshou_json.get('jczid')
+        if jczid is None:
+            return HttpResponse(u'没有找到检测站编号')
+        cph = jieshou_json.get('cph')
+        if cph is None:
+            return HttpResponse(u'没有找到牌照号')
+        else:
+            cph = cph.replace(' ','')
+        pzlb_str = jieshou_json.get('pzlb')
+        if pzlb_str is None:
+            return HttpResponse(u'没有找到牌照类别')
+        else:
+            pzlb_str = pzlb_str.replace(' ','')
+        pzlb_int = cheliangleixingUTF8toInt(pzlb_str)
+        if pzlb_str is None:
+            return HttpResponse(u'没有找到牌照类别ID')
+        czry = jieshou_json.get('czry')
+        if czry is None:
+            return HttpResponse(u'没有找到操作人员姓名')
+        else:
+            czry = czry.replace(' ','')
+        chezhudh = jieshou_json.get('chezhudh')
+        if chezhudh is None:
+            chezhudh = ''
+        else:
+            chezhudh = chezhudh.replace(' ','')
+        tjr = jieshou_json.get('tjr')
+        if tjr is not None:
+            tjr = u'%s推荐' % tjr
+        else:
+            tjr = ''
+        data = jieshou_json.get('data')
+        if data is None:
+            return HttpResponse(u'没有找到操作数据')
+        if jczid == 1:
+            t = ShouFeiChuLi_1(cph,pzlb_int,pzlb_str,chezhudh,czry,tjr,data)
+        return JsonResponse(t)
+
+
+
+
+
+
+    else:
+        result = {'zhuangtai': 'Error', 'zhuangtai_str': u'出现错误500'}
+        return JsonResponse(result)
+
+
+def ShouFeiChuLi_1(cph,pzlb_int,pzlb_str,chezhudh,czry,tjr,data):
+    fanhui_dic = {}
+    for i in data:
+        if i == 'anjian':#处理年检
+            jylb = data.get(i).get('jylb')
+            jfje = data.get(i).get('jfje')
+            anjian_fanhui =anjianshujucharu_1(cph,pzlb_int,pzlb_str,chezhudh,czry,jylb,jfje,tjr)
+            fanhui_dic['anjian'] = anjian_fanhui
+        if i == 'weiqi':#处理尾气
+            jylb = data.get(i).get('jylb')
+            jfje = data.get(i).get('jfje')
+            weiqi_fanhui = weiqishujucharu_1(cph,pzlb_int,pzlb_str,czry,jylb,jfje)
+            fanhui_dic['weiqi'] = weiqi_fanhui
+    return fanhui_dic
+
+
+
+def anjianshujucharu_1(cph,pzlb_int,pzlb_str,chezhudh,czry,jylb,jfje,tjr):
+    DBCONNECTSTR = 'DRIVER={SQL Server};SERVER=15.29.32.3;port=1433;DATABASE=NewGaJck_TB;UID=sa;PWD=svrcomputer;TDS_Version=7.1;'
+    conn = pyodbc.connect(DBCONNECTSTR)
+    cursor = conn.cursor()
+    cursor.execute('SELECT MAX(FPHM) FROM UFee')
+    zuidashu = cursor.fetchall()[0][0]
+    sql = "insert into  UFee (FPHM,CPH,PZLBID,PZLB,JCSX,JCLB,JKDW,SKXM,SKR,SKRQ,SKJE,BZ) values (?,?,?,?,?,?,?,?,?,?,?,?)"
+    parameters = (zuidashu+1, cph, pzlb_int, pzlb_str, 0, jylb, chezhudh, u'安检费', czry,datetime.datetime.now(), jfje, tjr)
+    cursor.execute(sql, parameters)
+    conn.commit()
+    conn.close()
+    return zuidashu+1
+
+def weiqishujucharu_1(cph,pzlb_int,pzlb_str,czry,jylb,jfje):
+    if pzlb_int == '16':
+        cph = cph + u'学'
+    elif pzlb_int == '23':
+        cph = cph + u'警'
+    DBCONNECTSTR = 'DRIVER={SQL Server};SERVER=15.29.32.61;port=1433;DATABASE=hbjcdb;UID=sa;PWD=svrcomputer;TDS_Version=7.1;'
+    conn = pyodbc.connect(DBCONNECTSTR)
+    cursor = conn.cursor()
+    sql = "insert into  UFee (CPH,PZLBID,PZLBStr,SFXMStr,JKDW,SKXM,JCCS,SKR,SKRQ,SKJE) values (?,?,?,?,?,?,?,?,?,?)"
+    parameters = (cph, pzlb_int, pzlb_str,jylb, '',u'尾气检测费', 1,czry, datetime.datetime.now(), jfje)
+    cursor.execute(sql, parameters)
+    conn.commit()
+    cursor.execute("select @@IDENTITY")#这条不需要提交
+    fanhui=cursor.fetchall()[0][0]
+    conn.close()
+
+    return fanhui
+
+
+
+def cheliangleixingUTF8toInt(pzlb_str):
+    dic1 = {u'小型汽车':'02',
+           u'大型汽车':'01',
+           u'使馆汽车':'03',
+           u'领馆汽车':'04',
+           u'境外汽车':'05',
+           u'挂车':'15',
+           u'农用运输车':'13',
+           u'拖拉机':'14',
+           u'教练摩托车':'17',
+           u'警用汽车':'23',
+           u'两、三轮摩托':'07',
+           u'外籍汽车':'06',
+           u'轻便摩托车':'08',
+           u'教练汽车':'16',
+           u'警用摩托车':'24'}
+    return dic1[pzlb_str]
+#
