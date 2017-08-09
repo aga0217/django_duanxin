@@ -15,13 +15,14 @@ import json
 import requests
 import time
 from xhtml2pdf import pisa
-import testprint
+#import testprint
 
 dizhi = ''
 skr_username = ''
 skr_username_str = u''
 jcz_id = ''
 user_pass = ''
+CAN_TUIKUAN = ''
 class denglu_chuangkou(QDialog,Ui_denglu_Dialog):
     def __init__(self, parent=None):
         super(denglu_chuangkou, self).__init__(parent)
@@ -91,8 +92,10 @@ class denglu_chuangkou(QDialog,Ui_denglu_Dialog):
         elif result.get('denglu') == True:
             global skr_username
             global skr_username_str
+            global CAN_TUIKUAN
             skr_username = result.get('username')
             skr_username_str = result.get('user_str')
+            CAN_TUIKUAN = result.get('is_tuikuan')
             global user_pass
             user_pass = self.password.text()
             self.accept()  # 关键
@@ -224,12 +227,19 @@ class jiezhang_chuangkou(QDialog,Ui_Ui_jiezhang_Dialog):
     def __init__(self, parent=None):
         super(jiezhang_chuangkou, self).__init__(parent)
         self.setupUi(self)
+        today = datetime.date.today()
+        xianshiqiri = today+ datetime.timedelta(-1)
+        self.jiezhang_dateEdit.setDate(xianshiqiri)
         self.anjian_radioButton.toggled.connect(lambda :self.Clickradiobutton())
         self.Button_dayin.setDisabled(True)
-        self.Button_dayin.clicked.connect(lambda :self.PrintBill())
+        self.Button_chazhaojiehangdan.setDisabled(True)
+        self.Button_chazhaojiehangdan.clicked.connect(lambda :self.chazhaojiezhangdan())
+        self.Button_dayin.clicked.connect(lambda :self.PrintBill())#当日结账并打印
+        self.Button_chongxindayin.clicked.connect(lambda :self.reprint())#单独打印
 
     def Clickradiobutton(self):
         if self.anjian_radioButton.isChecked():
+            self.Button_chazhaojiehangdan.setEnabled(True)
             self.Button_dayin.setEnabled(True)
             self.jiesuangxiangmu = 'anjian'
             data = {'jczid':jcz_id,'czry':skr_username,'czry_pass':user_pass,'jiesuanxiangmu':self.jiesuangxiangmu}
@@ -241,6 +251,7 @@ class jiezhang_chuangkou(QDialog,Ui_Ui_jiezhang_Dialog):
                 f.close()
             self.webView.load(QUrl.fromLocalFile(os.path.abspath("shoufeidan.html")))
         if self.weiqi_radioButton.isChecked():
+            self.Button_chazhaojiehangdan.setEnabled(True)
             self.Button_dayin.setEnabled(True)
             self.jiesuangxiangmu = 'weiqi'
             data = {'jczid':jcz_id,'czry':skr_username,'czry_pass':user_pass,'jiesuanxiangmu':self.jiesuangxiangmu}
@@ -251,7 +262,22 @@ class jiezhang_chuangkou(QDialog,Ui_Ui_jiezhang_Dialog):
                 f.write(result_rep)
                 f.close()
             self.webView.load(QUrl.fromLocalFile(os.path.abspath("shoufeidan.html")))
-    def PrintBill(self):
+
+    def chazhaojiezhangdan(self):#查找结账单
+        date_str = self.jiezhang_dateEdit.date().toString("yyyy-MM-dd")
+        #datetime格式不能打包到json，这里传输字符串
+        data = {'jczid': jcz_id, 'czry': skr_username, 'czry_pass': user_pass,
+                'jiesuanxiangmu': self.jiesuangxiangmu,'jiezhangriqi':date_str}
+        url = dizhi + 'jiezhangyulan/'
+
+        resp = requests.post(url, verify=False, data=json.dumps(data))
+        result_rep = resp.content
+        with open('shoufeidan.html', 'wb') as f:
+            f.write(result_rep)
+            f.close()
+        self.webView.load(QUrl.fromLocalFile(os.path.abspath("shoufeidan.html")))#结账单与收费单使用同一文件
+
+    def PrintBill(self):#当日结账并打印
         jiesuanxiangmu = self.jiesuangxiangmu
         data = {'jczid': jcz_id, 'czry': skr_username, 'czry_pass': user_pass, 'jiesuanxiangmu': jiesuanxiangmu}
         lianjie = Window().LianJie('jiezhang/',data)
@@ -269,6 +295,10 @@ class jiezhang_chuangkou(QDialog,Ui_Ui_jiezhang_Dialog):
             self.webView.load(QUrl.fromLocalFile(os.path.abspath("shoufeidan.html")))
             self.Button_dayin.setDisabled(True)
 
+    def reprint(self):#单独打印
+        filename = 'shoufeidan.html'
+        Window().HtmlToPDF(filename)
+        testprint.printPDF(filename)
 
 
 
@@ -299,15 +329,17 @@ class Window(QMainWindow,Ui_MainWindow):
         self.qita_jine4 = 0
         self.button_shoukuan.setDisabled(True)
         self.button_chexiao.setDisabled(True)
+        if not CAN_TUIKUAN:
+            self.button_tuikuan.setDisabled(True)
         #self.button_dayin.setDisabled((True))
         #self.button_jiezhang.setDisabled(True)
         #self.button_biaojikaipiao.setDisabled(True)
         self.fukuangfangshi_list = [u'现金',u'微信支付',u'支付宝支付',u'银行卡',u'预付费卡']
         self.cheliang_leixing_list = ['--',u'小型汽车',u'大型汽车',u'挂车',u'两、三轮摩托车',u'教练汽车',u'农用运输车',u'警用汽车',
-                                     u'警用摩托车']
+                                     u'警用摩托车',u'轻便摩托车']
         self.chepai_qian.addItems([u'蒙',u'京',u'津',u'沪',u'渝',u'冀',u'豫',u'云',u'辽',u'黑',u'湘',
                                        u'皖',u'鲁',u'新',u'苏',u'浙',u'赣',u'桂',u'甘',u'晋',u'陕',u'吉',
-                                       u'闽',u'贵',u'青',u'藏',u'琼',u'粤'])
+                                       u'闽',u'贵',u'青',u'藏',u'琼',u'粤',u'川',u'宁',u'鄂'])
         self.chepai_zimu.addItems(['A','B','C','D','E','F','G','H','J','K','L','M','N','O','P','Q','R','S','T','U','V','W',
                                    'X','Y','Z','--'])
         self.chaxun_shoufeixiangmu.addItems(['--',u'安检',u'尾气',u'其他'])
@@ -320,7 +352,8 @@ class Window(QMainWindow,Ui_MainWindow):
                                           '13':[u'在用机动车检验-110',u'在用机动车检验-70',u'注册登记检验-110',u'过户提档-110',u'事故车辆检验-100'],
                                           '16':[u'在用机动车检验-110',u'注册登记检验-110',u'过户提档-110',u'事故车辆检验-100'],
                                           '23':[u'在用机动车检验-90',u'在用机动车检验-110'],
-                                          '24':[u'在用机动车检验-70',u'注册登记检验-70',u'过户提档-70',u'事故车辆检验-100']
+                                          '24':[u'在用机动车检验-70',u'注册登记检验-70',u'过户提档-70',u'事故车辆检验-100'],
+                                          '08':[u'在用机动车检验-70',u'注册登记检验-70',u'过户提档-70',u'事故车辆检验-100']
 
                                           }
         self.anjianshoufei_xiangmu_jine_dic = {'02':{u'在用机动车检验-90':90,u'注册登记检验-90':90,u'过户提档-90':90,u'事故车辆检验-100':100,
@@ -333,6 +366,8 @@ class Window(QMainWindow,Ui_MainWindow):
                                                '16':{u'在用机动车检验-110':110,u'注册登记检验-110':110,u'过户提档-110':110,u'事故车辆检验-100':110},
                                                '23':{u'在用机动车检验-90':90,u'在用机动车检验-110':110},
                                                '24':{u'在用机动车检验-70':70,u'注册登记检验-70':70,u'过户提档-70':70,u'事故车辆检验-100':100},
+                                               '08': {u'在用机动车检验-70': 70, u'注册登记检验-70': 70, u'过户提档-70': 70,
+                                                      u'事故车辆检验-100': 100},
                                                }
         self.weiqishoufei_xiangmu_list = [u'稳态收费-80',u'不透光中型-90',u'不透光大型-115',u'稳态半费-40',
                                           u'不透光中型半费-45',u'不透光大型半费-55',u'复检费-40',u'不透光小型-80',u'出租车-65',u'补打报告单-50']
@@ -346,7 +381,7 @@ class Window(QMainWindow,Ui_MainWindow):
 
         self.chaxun_chepai_qian.addItems([u'蒙',u'京',u'津',u'沪',u'渝',u'冀',u'豫',u'云',u'辽',u'黑',u'湘',
                                        u'皖',u'鲁',u'新',u'苏',u'浙',u'赣',u'桂',u'甘',u'晋',u'陕',u'吉',
-                                       u'闽',u'贵',u'青',u'藏',u'琼',u'粤'])
+                                       u'闽',u'贵',u'青',u'藏',u'琼',u'粤',u'川'])
         self.chaxun_chepai_zimu.addItems(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V',
                                           'W','X', 'Y', 'Z', '--'])
         self.start_dateTimeEdit.setDate(datetime.date.today())#设置时间框为今天，setDateTime为设定时间
@@ -390,6 +425,8 @@ class Window(QMainWindow,Ui_MainWindow):
         self.button_chaxun.clicked.connect(lambda :self.Search())
         self.button_dayin.clicked.connect(lambda :self.PrintBill())
         self.button_jiezhang.clicked.connect(lambda :self.JieZhang())
+        #self.liebiao_table.doubleClicked.connect(lambda :self.test())#TODO:测试表格双击动作
+        self.button_tuikuan.clicked.connect(lambda :self.tuikuan())
 
     def XiuGaiMiMa(self):
         self.xiugaimima_chuankou = xiugaimima_chuangkou()
@@ -411,7 +448,15 @@ class Window(QMainWindow,Ui_MainWindow):
     def test(self):
         #print self.start_dateTimeEdit.dateTime().toPython()#转换为python datetime格式
         #self.label_xianjin.setText('50')#设置文本内容，只接受str
-        print self.qitajine_1_value
+        #print self.qitajine_1_value
+        id_list = []
+        rows = self.SelectRow()
+        model = self.liebiao_table.model()
+        for row in rows:
+            index = model.index(row,0)
+            id_list.append(int((model.data(index))))
+        print id_list
+
     def CheliangleixingToInt(self,cheliangleixing_str):#将车辆类型文本转化为'01'数字
         dic1 = {u'小型汽车': '02',
                 u'大型汽车': '01',
@@ -502,8 +547,6 @@ class Window(QMainWindow,Ui_MainWindow):
 
         self.ChangeLcd()
 
-
-
     def Click_qitashoufeixiangmu1(self):
         qitashoufeixiangmu_val = unicode(self.qita_xiangmu1.currentText())
         if qitashoufeixiangmu_val != '--':
@@ -581,7 +624,6 @@ class Window(QMainWindow,Ui_MainWindow):
             self.ChangeLcdToZero()
         self.ChangeLcd()
 
-
     def FinishQitajine2(self):
         try:
             self.qita_jine2 = int(self.qitajine_2.text())
@@ -592,7 +634,6 @@ class Window(QMainWindow,Ui_MainWindow):
             self.ChangeLcdToZero()
         self.ChangeLcd()
 
-
     def FinishQitajine3(self):
         try:
             self.qita_jine3 = int(self.qitajine_3.text())
@@ -602,7 +643,6 @@ class Window(QMainWindow,Ui_MainWindow):
             self.qitajine_3.clear()
             self.ChangeLcdToZero()
         self.ChangeLcd()
-
 
     def FinishQitajine4(self):
         try:
@@ -636,6 +676,7 @@ class Window(QMainWindow,Ui_MainWindow):
         self.qitajine_4.clear()
         self.qitajine_4.setDisabled(True)
         self.fukuanfangshi.clear()
+        self.pingzhenghao.clear()
         self.ChangeLcdToZero()
         self.button_shoukuan.setDisabled(True)
         self.button_chexiao.setDisabled(True)
@@ -659,10 +700,28 @@ class Window(QMainWindow,Ui_MainWindow):
         self.ReMoveRow()
         self.FreTableOnRun()
 
+    def tuikuan(self):#TODO:完成退款处理
 
-
-
-
+        id_list = []
+        rows = self.SelectRow()
+        model = self.liebiao_table.model()
+        for row in rows:
+            index = model.index(row,0)
+            id_list.append(int((model.data(index))))
+        if len(id_list) == 0 or len(id_list) != 1:
+            self.tixingkuang.setText(u'一次只能选择一条记录')
+            self.tixingkuang.exec_()
+        data = {'jczid': jcz_id, 'czry': skr_username, 'czry_pass': user_pass,'id_list':id_list}
+        lianjie = self.LianJie('tuikuan/', data)
+        fanhui = lianjie.get('chenggong')
+        if fanhui == True:
+            self.tixingkuang.setText(u'处理成功')
+            self.tixingkuang.exec_()
+        else:
+            self.tixingkuang.setText(u'发生错误')
+            self.tixingkuang.exec_()
+        self.ReMoveRow()
+        self.FreTableOnRun()
 
 
     def GetValue(self):

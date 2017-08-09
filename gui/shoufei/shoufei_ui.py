@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'shoufei_ui.ui'
 #
-# Created: Sat Jul 29 20:15:14 2017
+# Created: Tue Aug  8 14:04:01 2017
 #      by: pyside-uic 0.2.15 running on PySide 1.2.4
 #
 # WARNING! All changes made in this file will be lost!
@@ -397,6 +397,8 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         font.setFamily("Helvetica")
         font.setPointSize(12)
+        font.setWeight(75)
+        font.setBold(True)
         self.label_weixin.setFont(font)
         self.label_weixin.setText("")
         self.label_weixin.setObjectName("label_weixin")
@@ -704,6 +706,7 @@ class Ui_MainWindow(object):
         font.setWeight(75)
         font.setBold(True)
         self.is_time.setFont(font)
+        self.is_time.setText("")
         self.is_time.setObjectName("is_time")
         self.horizontalLayout_11.addWidget(self.is_time)
         self.label_14 = QtGui.QLabel(self.layoutWidget1)
@@ -762,7 +765,7 @@ class Ui_MainWindow(object):
         self.button_chaxun.setObjectName("button_chaxun")
         self.horizontalLayout_12.addWidget(self.button_chaxun)
         self.button_tuikuan = QtGui.QPushButton(self.layoutWidget1)
-        self.button_tuikuan.setEnabled(False)
+        self.button_tuikuan.setEnabled(True)
         self.button_tuikuan.setMaximumSize(QtCore.QSize(100, 25))
         font = QtGui.QFont()
         font.setFamily("Helvetica")
@@ -865,7 +868,6 @@ class Ui_MainWindow(object):
         self.label_21.setText(QtGui.QApplication.translate("MainWindow", " 银行卡：", None, QtGui.QApplication.UnicodeUTF8))
         self.label_13.setText(QtGui.QApplication.translate("MainWindow", "车牌号：", None, QtGui.QApplication.UnicodeUTF8))
         self.label_16.setText(QtGui.QApplication.translate("MainWindow", "检验类别：", None, QtGui.QApplication.UnicodeUTF8))
-        self.is_time.setText(QtGui.QApplication.translate("MainWindow", " ", None, QtGui.QApplication.UnicodeUTF8))
         self.label_14.setText(QtGui.QApplication.translate("MainWindow", "开始时间", None, QtGui.QApplication.UnicodeUTF8))
         self.label_15.setText(QtGui.QApplication.translate("MainWindow", "截止时间", None, QtGui.QApplication.UnicodeUTF8))
         self.button_shoukuan.setText(QtGui.QApplication.translate("MainWindow", "收款", None, QtGui.QApplication.UnicodeUTF8))
@@ -874,6 +876,6 @@ class Ui_MainWindow(object):
         self.button_tuikuan.setText(QtGui.QApplication.translate("MainWindow", "退款", None, QtGui.QApplication.UnicodeUTF8))
         self.button_dayin.setText(QtGui.QApplication.translate("MainWindow", "打印", None, QtGui.QApplication.UnicodeUTF8))
         self.button_biaojikaipiao.setText(QtGui.QApplication.translate("MainWindow", "标记开票", None, QtGui.QApplication.UnicodeUTF8))
-        self.button_jiezhang.setText(QtGui.QApplication.translate("MainWindow", "当日结账", None, QtGui.QApplication.UnicodeUTF8))
+        self.button_jiezhang.setText(QtGui.QApplication.translate("MainWindow", "结账", None, QtGui.QApplication.UnicodeUTF8))
         self.button_xiugaimima.setText(QtGui.QApplication.translate("MainWindow", "修改密码", None, QtGui.QApplication.UnicodeUTF8))
 
