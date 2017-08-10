@@ -1032,6 +1032,45 @@ def Search(requset):
     else:
         return JsonResponse({'chenggong': False, 'cuowu':'500'})
 
+def searchtell(requset):
+    if requset.method == 'POST':
+        try:
+            ip = requset.META['REMOTE_ADDR']
+        except:
+            return JsonResponse({'chenggong': False, 'cuowu': u'IP地址不匹配'})
+        if ip not in ip_yunxu:
+            return JsonResponse({'chenggong': False, 'cuowu': u'%s访问地址不匹配02' % ip})
+        # 处理json
+        try:
+            jieshou_json = json.loads(requset.body)
+        except ValueError:
+            return JsonResponse({'chenggong': False, 'cuowu': u'数据格式不对'})
+        jczid = jieshou_json.get('jczid')
+        if jczid is None:
+            return JsonResponse({'chenggong': False, 'cuowu': u'没有找到检测站编号'})
+        czry_user = jieshou_json.get('czry')  # 操作人员用户名
+        if czry_user is None:
+            return JsonResponse({'chenggong': False, 'cuowu': u'没有找到操作人员用户名'})
+        czry_pass = jieshou_json.get('czry_pass')
+        if czry_pass is None:
+            return JsonResponse({'chenggong': False, 'cuowo': u'没有找到操作人员密码'})
+        paizhaohao = jieshou_json.get('cph')
+        if paizhaohao == None:
+            return JsonResponse({'chenggong': False, 'cuowo': u'没有找到车牌号'})
+        cheliangleibie_id = jieshou_json.get('cheliangleixingint')
+        if cheliangleibie_id == None:
+            return JsonResponse({'chenggong': False, 'cuowo': u'没有找到车辆类型'})
+        yanzheng = DX_ShouFei_UserName().UserDengLu(czry_user,czry_pass)
+        if yanzheng.get('denglu') != True:
+            return JsonResponse({'chenggong':False,'cuowu':yanzheng.get('cuowu')})
+        qs = DX_CarInfo.objects.filter(paizhaohao=paizhaohao,paizhaoleibie_id=cheliangleibie_id)
+        if not qs:
+            return JsonResponse({'chenggong': True, 'data':{'dianhua':None}})
+        else:
+            dianhua = AESCipher().decrypt(qs[0].dianhua)
+            return JsonResponse({'chenggong': True, 'data':{'dianhua':dianhua}})
+
+
 
 def JieZhangYulan(requset):#结账预览
     if requset.method == 'POST':

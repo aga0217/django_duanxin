@@ -385,22 +385,7 @@ class Window(QMainWindow,Ui_MainWindow):
         self.chaxun_chepai_zimu.addItems(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V',
                                           'W','X', 'Y', 'Z', '--'])
         self.start_dateTimeEdit.setDate(datetime.date.today())#设置时间框为今天，setDateTime为设定时间
-        #TODO:表格的设置应该来自webservices
         self.FreTableOnRun()
-        #self.Header_list = [u'序号','ID', u'车牌号', u'车辆类别', u'收款项目',u'检验项目',u'收款金额',u'收款日期',u'收款人',u'支付方式',u'发票开具日期']
-        #self.liebiao_table.setColumnCount(len(self.Header_list))
-        #self.liekuan = [50,70,90,110,110,110,110,110,110,110,110]
-        #for i in self.liekuan:
-            #self.liebiao_table.setColumnWidth(self.liekuan.index(i), i)
-        #self.liebiao_table.setHorizontalHeaderLabels(self.Header_list)
-        #self.liebiao_table.setColumnWidth(1, 90)
-        #self.liebiao_table.setColumnWidth(2, 110)
-        #self.liebiao_table.setColumnWidth(3, 110)
-        #self.liebiao_table.setColumnWidth(4, 110)
-        #self.liebiao_table.setColumnWidth(5, 110)
-        #self.liebiao_table.setColumnWidth(6, 110)
-        #self.liebiao_table.setColumnWidth(7, 110)
-        #self.liebiao_table.setColumnWidth(8, 110)
         self.chepai_hou.editingFinished.connect(lambda :self.FinishiChePaiHou())
         self.dianhua.editingFinished.connect(lambda :self.FinishDianHua())
 
@@ -483,6 +468,7 @@ class Window(QMainWindow,Ui_MainWindow):
             self.SetQitaShoufeixiangmu()
             self.SetFukuangFangshi()
             self.button_chexiao.setEnabled(True)
+        self.filltell()
     def SetQitaShoufeixiangmu(self):
         self.qita_xiangmu1.clear()
         self.qita_xiangmu2.clear()
@@ -894,7 +880,7 @@ class Window(QMainWindow,Ui_MainWindow):
         self.CheXiao()
         Header_list = ['ID', u'车牌号', u'车辆类别', u'收款项目', u'检验项目', u'收款金额', u'收款日期', u'收款人', u'支付方式',
                             u'发票开具日期',u'客服',u'结账日期']
-        liekuan_list = [40, 70, 70, 50, 110, 140, 150, 80, 80, 130, 50,140]
+        liekuan_list = [40, 70, 70, 50, 110, 50, 150, 80, 80, 130, 50,140]
         self.FillTable(Header_list,liekuan_list,self.qs_list)
 
     def VerifRePay(self,jylb_str,cph,cheliangleixingint):
@@ -912,6 +898,20 @@ class Window(QMainWindow,Ui_MainWindow):
                 return
             if ret == QMessageBox.RejectRole:
                 self.CheXiao()
+
+    def filltell(self):
+        getval = self.GetValue()
+        chepaihao = getval.get('chepaihao')
+        cheliangleixing_id = getval.get('cheliangleixing_id')
+        data = {'jczid':jcz_id,'czry':skr_username,'czry_pass':user_pass,'cph':chepaihao,
+                'cheliangleixingint':cheliangleixing_id}
+        lianjie = self.LianJie('searchtell/',data)
+        dianhua = lianjie.get('dianhua')
+        print dianhua
+        if dianhua:
+            self.dianhua.setText(dianhua)
+
+
 
 
     def FillTable(self,Header_list,liekuan_list,qs_list):
@@ -1043,7 +1043,7 @@ class Window(QMainWindow,Ui_MainWindow):
             self.ReMoveRow()
             Header_list = ['ID', u'车牌号', u'车辆类别', u'收款项目', u'检验项目', u'收款金额', u'收款日期', u'收款人', u'支付方式',
                            u'发票开具日期', u'客服',u'结账日期']
-            liekuan_list = [40, 70, 70, 50, 110, 140, 150, 80, 80, 130, 50,140]
+            liekuan_list = [40, 70, 70, 50, 110, 50, 150, 80, 80, 130, 50,140]
             qs_list = lianjie.get('qs')
             self.FillTable(Header_list,liekuan_list,qs_list)
     def PrintBill(self):
