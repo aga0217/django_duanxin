@@ -1029,6 +1029,8 @@ class Window(QMainWindow,Ui_MainWindow):
                 return
 
         cph = chepaiqian+chepaizimu+chepaihou
+        if chepaizimu == '--':
+            cph = chepaiqian+chepaihou
         if shoufeixiangmu == '--':
             shoufeixiangmu = None
 
