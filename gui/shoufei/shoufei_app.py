@@ -412,6 +412,7 @@ class Window(QMainWindow,Ui_MainWindow):
         self.button_jiezhang.clicked.connect(lambda :self.JieZhang())
         #self.liebiao_table.doubleClicked.connect(lambda :self.test())#TODO:测试表格双击动作
         self.button_tuikuan.clicked.connect(lambda :self.tuikuan())
+        self.button_fretable.clicked.connect(lambda :self.fretable())
 
     def XiuGaiMiMa(self):
         self.xiugaimima_chuankou = xiugaimima_chuangkou()
@@ -641,6 +642,7 @@ class Window(QMainWindow,Ui_MainWindow):
         self.ChangeLcd()
 
     def CheXiao(self):
+        self.chaxun_chepai_hou.clear()
         self.chepai_hou.clear()
         self.cheliang_leixing.clear()
         self.cheliang_leixing.addItems(self.cheliang_leixing_list)
@@ -882,6 +884,11 @@ class Window(QMainWindow,Ui_MainWindow):
                             u'发票开具日期',u'客服',u'结账日期']
         liekuan_list = [40, 70, 70, 50, 110, 50, 150, 80, 80, 130, 50,140]
         self.FillTable(Header_list,liekuan_list,self.qs_list)
+
+    def fretable(self):
+        self.chaxun_chepai_hou.clear()
+        self.ReMoveRow()
+        self.FreTableOnRun()
 
     def VerifRePay(self,jylb_str,cph,cheliangleixingint):
 

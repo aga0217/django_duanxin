@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'shoufei_ui.ui'
 #
-# Created: Tue Aug  8 14:04:01 2017
+# Created: Mon Aug 14 10:57:35 2017
 #      by: pyside-uic 0.2.15 running on PySide 1.2.4
 #
 # WARNING! All changes made in this file will be lost!
@@ -764,6 +764,16 @@ class Ui_MainWindow(object):
         self.button_chaxun.setFont(font)
         self.button_chaxun.setObjectName("button_chaxun")
         self.horizontalLayout_12.addWidget(self.button_chaxun)
+        self.button_fretable = QtGui.QPushButton(self.layoutWidget1)
+        self.button_fretable.setMaximumSize(QtCore.QSize(100, 25))
+        font = QtGui.QFont()
+        font.setFamily("Helvetica")
+        font.setPointSize(14)
+        font.setWeight(75)
+        font.setBold(True)
+        self.button_fretable.setFont(font)
+        self.button_fretable.setObjectName("button_fretable")
+        self.horizontalLayout_12.addWidget(self.button_fretable)
         self.button_tuikuan = QtGui.QPushButton(self.layoutWidget1)
         self.button_tuikuan.setEnabled(True)
         self.button_tuikuan.setMaximumSize(QtCore.QSize(100, 25))
@@ -873,6 +883,7 @@ class Ui_MainWindow(object):
         self.button_shoukuan.setText(QtGui.QApplication.translate("MainWindow", "收款", None, QtGui.QApplication.UnicodeUTF8))
         self.button_chexiao.setText(QtGui.QApplication.translate("MainWindow", "撤销", None, QtGui.QApplication.UnicodeUTF8))
         self.button_chaxun.setText(QtGui.QApplication.translate("MainWindow", "查询", None, QtGui.QApplication.UnicodeUTF8))
+        self.button_fretable.setText(QtGui.QApplication.translate("MainWindow", "刷新列表", None, QtGui.QApplication.UnicodeUTF8))
         self.button_tuikuan.setText(QtGui.QApplication.translate("MainWindow", "退款", None, QtGui.QApplication.UnicodeUTF8))
         self.button_dayin.setText(QtGui.QApplication.translate("MainWindow", "打印", None, QtGui.QApplication.UnicodeUTF8))
         self.button_biaojikaipiao.setText(QtGui.QApplication.translate("MainWindow", "标记开票", None, QtGui.QApplication.UnicodeUTF8))
