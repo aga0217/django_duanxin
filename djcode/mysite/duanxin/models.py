@@ -118,6 +118,7 @@ class DX_ShouFei(models.Model):
     is_zhuanru = models.BooleanField(verbose_name=u'是否是转入车',default=False)
     is_tuikuan = models.BooleanField(verbose_name=u'是否退款',default=False)
     tuikuan_riqi = models.DateTimeField(verbose_name=u'退款日期',null=True)
+    tuikuan_shuoming = models.CharField(max_length=256,verbose_name=u'退款说明',null=True)
 
     def tuikuan(self,user,pws,id):
         yanzheng = DX_ShouFei_UserName().UserDengLu(user,pws)
@@ -159,6 +160,7 @@ class DX_ShouFei(models.Model):
 
 
     #TODO:标记开票的不允许退款
+
 class DX_ShouFei_UserName(models.Model):
     username = models.CharField(max_length=30,verbose_name=u'用户名')
     userxingming = models.CharField(max_length=30,verbose_name=u'员工姓名')
@@ -197,6 +199,31 @@ class DX_ShouFei_UserName(models.Model):
                 return {'chenggong':True}
             else:
                 return {'chenggong':False,'cuowu':u'原始密码未通过验证或用户被禁用'}
+
+class DX_CustomerFile(models.Model):
+    jczid = models.CharField(max_length=5, verbose_name=u'检测站id')
+    paizhaohao = models.CharField(max_length=30, verbose_name=u'牌照号')
+    cheliangleibie_id = models.CharField(max_length=30, verbose_name=u'车辆类别ID')
+    cheliangleibie_str = models.CharField(max_length=256, verbose_name=u'车辆类别str')
+    chezhudianhua = models.CharField(max_length=30, verbose_name=u'车主电话', null=True)
+    banliriqi = models.DateTimeField(verbose_name=u'办理日期')
+    anjianshoufei = models.IntegerField(verbose_name=u'安检收费金额',null=True)
+    weiqishoufei = models.IntegerField(verbose_name=u'尾气收费金额',null=True)
+    heji = models.IntegerField(verbose_name=u'合计收费金额')#不包括其他收费项目，只有安检、尾气、服务费
+    tuijianren = models.CharField(max_length=256,verbose_name=u'推荐人',null=True)
+    jingbanren = models.CharField(max_length=256,verbose_name=u'经办人',null=True)
+    isdel = models.BooleanField(default=False,verbose_name=u'是否被删除')
+    czry_user = models.CharField(max_length=256,verbose_name=u'操作人用户名')
+    czry = models.CharField(max_length=256,verbose_name=u'操作人员姓名')
+
+
+    def addcustomerfile(self,jczid,paizhaohao,cheliangleibie_id,cheliangleibie_str,chezhudianhua,
+                        anjianshoufei,weiqishoufei,tuijianren,czry_user,czry):
+        q = DX_CustomerFile(jczid=jczid,paizhaohao=paizhaohao,cheliangleibie_id=cheliangleibie_id,
+                            cheliangleibie_str=cheliangleibie_str,chezhudianhua=chezhudianhua,
+                            anjianshoufei=anjianshoufei,weiqishoufei=weiqishoufei,heji=anjianshoufei+weiqishoufei,
+                            tuijianren=tuijianren,banliriqi=datetime.datetime.now(),czry_user=czry_user,czry=czry)
+        q.save()
 
 
 
