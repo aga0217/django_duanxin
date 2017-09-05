@@ -820,9 +820,26 @@ def webservice_shoufei(requset):#收费webserices
             fkfs_id = '04'
         elif fkfs == u'银行卡':
             fkfs_id = '05'
+        tuijianren = jieshou_json.get('tuijianren')
         data = jieshou_json.get('data')
         if data is None:
             return JsonResponse({'chenggong':False,'cuowu':u'没有找到操作数据'})
+        print 'tuijianren:'+tuijianren
+        if tuijianren:
+            try:
+                anjianshoufei = data.get('anjian').get('jfje')
+            except:
+                return JsonResponse({'chenggong': False, 'cuowu': u'填写推荐人的情况下必须添加安检收费'})
+            try:
+                weiqishoufei = data.get('weiqi').get('jfje')
+
+            except:
+                weiqishoufei = 0
+
+            DX_CustomerFile().addcustomerfile(jczid,cph,pzlb_id,pzlb_str,chezhudh,anjianshoufei,weiqishoufei,tuijianren,
+                                              czry_user,czry)
+
+
         t={}
         if jczid == '01':
             t = ShouFeiChuLi_1(jczid,cph,pzlb_id,pzlb_str,chezhudh,czry,czry_user,fkfs_id,fkfs,data)
@@ -830,6 +847,7 @@ def webservice_shoufei(requset):#收费webserices
             return JsonResponse({'chenggong':True,'data':True})
         elif t.get('chenggong') != True:
             return JsonResponse({'chenggong': False,'cuowu':u'插入数据时出现错误'})
+
 
     else:
         result = {'chenggong': False, 'cuowu': u'出现错误500'}
@@ -1070,8 +1088,6 @@ def searchtell(requset):
             dianhua = AESCipher().decrypt(qs[0].dianhua)
             return JsonResponse({'chenggong': True, 'data':{'dianhua':dianhua}})
 
-
-
 def JieZhangYulan(requset):#结账预览
     if requset.method == 'POST':
         # 验证IP地址
@@ -1112,7 +1128,6 @@ def JieZhangYulan(requset):#结账预览
             kwargs['jyxm'] = 'weiqi'
             jiesuanxiangmu = u'尾气'
         jiezhangriqi = jieshou_json.get('jiezhangriqi')
-        print jiezhangriqi
         shuju = []
         if jiezhangriqi == None:
             shuju = DX_ShouFei.objects.filter(is_jiezhang=False).filter(skr_username=czry_user,
@@ -1146,7 +1161,7 @@ def JieZhangYulan(requset):#结账预览
         df1.columns = ['车辆类别','数量','检验类别','单价','支付方式']
         tabledata_count = df1.groupby(['支付方式','单价','车辆类别','检验类别'],as_index=True).count().to_html()
         sum_zhifufangshi = df2.groupby(['zhifufangshi_str'],as_index=False).sum().to_dict('recodes')
-        print sum_zhifufangshi
+        #print sum_zhifufangshi
         #for i in dictolist:
             #cont_zhifufangshi.append({'zhifufangshi_str':i,'count':dictolist.get(i)})
 
@@ -1253,6 +1268,9 @@ def tuikuan(requset):
         pws = jieshou_json.get('czry_pass')
         if pws == None:
             return JsonResponse({'chenggong': False, 'cuowu': u'没有密码'})
+        tuikuanyuanyin = jieshou_json.get('tuikuanyuanyin')
+        if tuikuanyuanyin == None:
+            return JsonResponse({'chenggong':False,'cuowu':u'没有退款原因'})
         id_list = jieshou_json['id_list']
         if id_list == None or len(id_list) != 1:
             return JsonResponse({'chenggong': False, 'cuowu': u'没有找到列表'})
@@ -1278,19 +1296,13 @@ def tuikuan(requset):
         bjr_username = data_fahui.get('bjr_username')
         tuikuan_riqi = datetime.datetime.now()
         shujuchuli = ShouFeiChuLi_1(jczid,cph,pzlb_int,pzlb_str,chezhudh,czry,czry_user,fkfs_id,fkfs,data,
-                                        is_tuikuan,bjr,bjr_username,tuikuan_riqi)
+                                        is_tuikuan,bjr,bjr_username,tuikuan_riqi,tuikuanyuanyin)
         if shujuchuli.get('chenggong') == True:
             return JsonResponse({'chenggong': True,'data':{'chenggong':True}})
         else:
             return JsonResponse({'chenggong': False,'cuowu':u'发生了一些错误'})
     else:
         return JsonResponse({'chenggong': False, 'cuowu': u'500'})
-
-
-
-
-
-
 
 def PrintBill(requset,id):#单独打印票据
     try:
@@ -1314,7 +1326,6 @@ def PrintBill(requset,id):#单独打印票据
 
 
     return render_to_response('dandudyin.html', locals(), context_instance=RequestContext(requset))
-
 
 def ShouFeiDengLu(requset):
     if requset.method == 'POST':
@@ -1383,8 +1394,7 @@ def MiMaYanZheng(str1):
         return True
 
 def ShouFeiChuLi_1(jczid,cph,pzlb_int,pzlb_str,chezhudh,czry,czry_user,fkfs_id,fkfs,data,is_tuikuan = False,bjr = None,
-                   bjr_username=None,tuikuan_riqi = None):
-    fanhui_dic = {}
+                   bjr_username=None,tuikuan_riqi = None,tuikuanyuanyin = None):
     for i in data:
         if i == 'anjian':#处理年检
             is_kefu = data.get(i).get('is_kefu')
@@ -1399,7 +1409,8 @@ def ShouFeiChuLi_1(jczid,cph,pzlb_int,pzlb_str,chezhudh,czry,czry_user,fkfs_id,f
                            jyxm='anjian',jylb=jylb,dyid=anjian_fanhui,skr=czry,
                            skr_username=czry_user,skrq=datetime.datetime.now(),
                            skje=jfje,zhifufangshi_zimu=fkfs_id,zhifufangshi_str=fkfs,
-                           is_kefu=is_kefu,is_tuikuan=is_tuikuan,bjr=bjr,bjr_username=bjr_username,tuikuan_riqi=tuikuan_riqi)
+                           is_kefu=is_kefu,is_tuikuan=is_tuikuan,bjr=bjr,bjr_username=bjr_username,tuikuan_riqi=tuikuan_riqi,
+                           tuikuan_shuoming=tuikuanyuanyin)
 
             q.save()#TODO:处理返回值
         if i == 'weiqi':#处理尾气
@@ -1418,22 +1429,39 @@ def ShouFeiChuLi_1(jczid,cph,pzlb_int,pzlb_str,chezhudh,czry,czry_user,fkfs_id,f
                            jyxm='weiqi',jylb=jylb,dyid=weiqi_fanhui,skr=czry,
                            skr_username=czry_user,skrq=datetime.datetime.now(),
                            skje=jfje,zhifufangshi_zimu=fkfs_id,zhifufangshi_str=fkfs,is_tuikuan=is_tuikuan,
-                           bjr=bjr, bjr_username=bjr_username,tuikuan_riqi=tuikuan_riqi)
+                           bjr=bjr, bjr_username=bjr_username,tuikuan_riqi=tuikuan_riqi,tuikuan_shuoming=tuikuanyuanyin)
             q.save()
         if i == 'qita':
+            #这里的处理是为了兼容退款时发回的data数据格式不一致，缴费时发送的格式为{u'\u53cd\u5149\u6761': 20, u'\u53cd\u5149\u677f': 30}
+            #退款时发送的data为{'jylb': u'\u5b89\u5168\u9524', 'jfje': -50}
             dic1 = data.get(i)
-            for a in dic1:
-                jylb = a
-                jfje = dic1.get(a)
-                qita_fanhui = anjianshujucharu_1_qita(cph,pzlb_int,pzlb_str,czry,jylb,jfje)
+            jylb = dic1.get('jylb')
+            jfje = dic1.get('jfje')
+            if jylb == None and jfje == None:
+                for a in dic1:
+                    jylb = a
+                    jfje = dic1.get(a)
+                    qita_fanhui = anjianshujucharu_1_qita(cph,pzlb_int,pzlb_str,czry,jylb,jfje)
 
-                q = DX_ShouFei(jczid=jczid,paizhaohao=cph,cheliangleibie_id=pzlb_int,
+                    q = DX_ShouFei(jczid=jczid,paizhaohao=cph,cheliangleibie_id=pzlb_int,
                            cheliangleibie_str=pzlb_str,chezhudianhua=chezhudh,
                            jyxm='qita',jylb=jylb,dyid=qita_fanhui,skr=czry,
                            skr_username=czry_user,skrq=datetime.datetime.now(),
                            skje=jfje,zhifufangshi_zimu=fkfs_id,zhifufangshi_str=fkfs,is_tuikuan=is_tuikuan,
-                               bjr=bjr, bjr_username=bjr_username,tuikuan_riqi=tuikuan_riqi)
+                               bjr=bjr, bjr_username=bjr_username,tuikuan_riqi=tuikuan_riqi,tuikuan_shuoming=tuikuanyuanyin)
+                    q.save()
+            else:
+                qita_fanhui = anjianshujucharu_1_qita(cph, pzlb_int, pzlb_str, czry, jylb, jfje)
+                q = DX_ShouFei(jczid=jczid, paizhaohao=cph, cheliangleibie_id=pzlb_int,
+                           cheliangleibie_str=pzlb_str, chezhudianhua=chezhudh,
+                           jyxm='qita', jylb=jylb, dyid=qita_fanhui, skr=czry,
+                           skr_username=czry_user, skrq=datetime.datetime.now(),
+                           skje=jfje, zhifufangshi_zimu=fkfs_id, zhifufangshi_str=fkfs, is_tuikuan=is_tuikuan,
+                           bjr=bjr, bjr_username=bjr_username, tuikuan_riqi=tuikuan_riqi,
+                           tuikuan_shuoming=tuikuanyuanyin)
                 q.save()
+
+
     #返回刷新结果及分收款方式统计结果
     '''
     qs = list(DX_ShouFei.objects.filter(skr_username=czry_user,jczid=jczid,
@@ -1494,7 +1522,7 @@ def weiqishujucharu_1(cph,pzlb_int,pzlb_str,czry,jylb,jfje,is_zhuanru):
     conn.close()
 
     return fanhui
-def anjianshujucharu_1_qita(cph,pzlb_int,pzlb_str,czry,jylb,jfje):
+def anjianshujucharu_1_qita(cph,pzlb_int,pzlb_str,czry,jylb,jfje):#TODO:处理退费时发生错误
     DBCONNECTSTR = 'DRIVER={SQL Server};SERVER=15.29.32.3;port=1433;DATABASE=NewGaJck_TB;UID=sa;PWD=svrcomputer;TDS_Version=7.1;'
     conn = pyodbc.connect(DBCONNECTSTR)
     cursor = conn.cursor()
