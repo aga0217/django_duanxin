@@ -1555,185 +1555,101 @@ def cheliangleixingUTF8toInt(pzlb_str):
            u'警用摩托车':'24'}
     return dic1[pzlb_str]
 
+def dangansearch(requset):
+    if requset.method == 'POST':
+        # 验证IP地址
+        try:
+            ip = requset.META['REMOTE_ADDR']
+        except:
+            return JsonResponse({'chenggong': False, 'cuowu': u'IP地址不匹配'})
+        if ip not in ip_yunxu:
+            return JsonResponse({'chenggong': False, 'cuowu': u'%s访问地址不匹配02' % ip})
+        # 处理json
+        try:
+            jieshou_json = json.loads(requset.body)
+        except ValueError:
+            return JsonResponse({'chenggong': False, 'cuowu': u'数据格式不对'})
+        jczid = jieshou_json.get('jczid')
+        if jczid is None:
+            return JsonResponse({'chenggong': False, 'cuowu': u'没有找到检测站编号'})
+        cph = jieshou_json.get('cph')
+        if not cph :
+            return JsonResponse({'chenggong':False,'cuowu':u'没有找到车牌号信息'})
+        danganzhonglei = jieshou_json.get('danganzhonglei')
+        if not danganzhonglei:
+            return JsonResponse({'chenggong':False,'cuowu':u'没有档案种类'})
+        danganzhonglei_list = ['customerfile','carinfo']
+        #if danganzhonglei != 'customerfile' or danganzhonglei != 'carinfo':
+        if danganzhonglei not in danganzhonglei_list:
+            print 'danganzhonglei',danganzhonglei
+            return JsonResponse({'chenggong':False,'cuowu':u'档案种类标示不正确'})
+        is_datetime = jieshou_json.get('is_datetime')
+        if is_datetime == None:
+            return JsonResponse({'chenggong':False,'cuowu':u'没有找到datetime'})
+        if danganzhonglei == 'customerfile':
+            agve = {}
 
-#以下为自助查询车辆检测状态部分
-def zizhuchaxun_tijiao(request):#自助查询提交
-    title = u'车辆检测状态自助查询'
-    erbuyanzheng = False
-    erbuyanzhengneirong = u'提交后如果增加相应合同则无法修改！'
-    if request.method == 'POST':
-        form = DX_zizhuchaxun_tijiao_forms(request.POST)
-        if form.is_valid():
-            chepai_qian = form.cleaned_data['chepai_qian']
-            chepai_hou = form.cleaned_data['chepai_hou']
-            chepai_leibie = cheliangleixingUTF8toInt(form.cleaned_data['chepai_leibie'])
-            chepai_zimu = form.cleaned_data['chepai_zimu'].upper()
-            chepai_wanzheng = chepai_qian+chepai_hou+chepai_zimu
-            anjian_zhuangtai = anjian_zhuangtaichaxun(chepai_wanzheng,chepai_leibie).panduan()
-            weiqi_zhuangtai = weiqi_zhuangtaichaxun(chepai_wanzheng,chepai_leibie).zhuangtaichaxun()
-            #p = PinleiGL(pinleiname=pinleiname, isedit=1, pinleitype=pinleitype,danjia=danjia)
-            #q = PinleiType.objects.filter(type_name=pinleitype)
-            #q.update(isedit=0)
-            #messages.add_message(request, messages.SUCCESS, '数据添加成功！')
-            #p.save()
-            #return HttpResponseRedirect('/pinlei/pinleilist/')
-            return render_to_response('zizhu_dankehu_chaxunjiegu.html', locals(), context_instance=RequestContext(request))
+            if is_datetime == True:
+                try:
+                    starttime = datetime.datetime.strptime(jieshou_json['is_datetime_start'],"%Y-%m-%d")
+                except:
+                    return JsonResponse({'chenggong':False,'cuowu':u'格式转换错误'})
+                try:
+                    endtime = datetime.datetime.strptime(jieshou_json['is_datetime_end'],"%Y-%m-%d")
+                except:
+                    return JsonResponse({'chenggong':False,'cuowu':u'格式转换错误'})
+                agve['banliriqi__range'] = (starttime, endtime)
+            if cph != '':
+                agve['paizhaohao__icontains'] = cph
+            qs = list(DX_CustomerFile.objects.filter(jczid=jczid,isdel=False).filter(**agve).values('id','paizhaohao','cheliangleibie_str',
+                                                                                               'chezhudianhua','banliriqi','anjianshoufei',
+                                                                                               'weiqishoufei','heji','tuijianren'))
+            if not qs:
+                return JsonResponse({'chenggong': True, 'data': {'qs': None}})
+            return JsonResponse({'chenggong': True, 'data': {'qs': qs}})
+        if danganzhonglei == 'carinfo':
+            agve = {}
+            if is_datetime == True:
+                try:
+                    starttime = datetime.datetime.strptime(jieshou_json['is_datetime_start'],"%Y-%m-%d")
+                except:
+                    return JsonResponse({'chenggong':False,'cuowu':u'格式转换错误'})
+                try:
+                    endtime = datetime.datetime.strptime(jieshou_json['is_datetime_end'],"%Y-%m-%d")
+                except:
+                    return JsonResponse({'chenggong':False,'cuowu':u'格式转换错误'})
+                agve['chuanjianriqi__range'] = (starttime, endtime)
+            if cph != '':
+                agve['paizhaohao__icontains'] = cph
+            nexttime = jieshou_json.get('nexttime')
+            if nexttime !='':
+                if yanzhengnexttime(nexttime):
+                    agve['next_riqi'] = nexttime
+            qs =list(DX_CarInfo.objects.filter(iswanzheng=True).filter(**agve).values('id','paizhaohao','paizhaoleibie_str',
+                                                                                      'dipanhao','next_riqi','chuanjianriqi',
+                                                                                      'jiancecishu','chezhu'))
+            if not qs:
+                return JsonResponse({'chenggong': True, 'data': {'qs': None}})
+            return JsonResponse({'chenggong': True, 'data': {'qs': qs}})
+
+
+
+
+
+
     else:
-        form = DX_zizhuchaxun_tijiao_forms()
-    return render_to_response('add.html', locals(), context_instance=RequestContext(request))
+        return JsonResponse({'chenggong': False, 'cuowu': '500'})
 
-class anjian_zhuangtaichaxun:
-    """查询安检和尾气的车辆状态"""
-
-    fanhui = {}
-    def __init__(self,chepai_wanzheng,chepai_leibie):
-        self.chepai_wanzheng = chepai_wanzheng
-        self.chepai_leibie = chepai_leibie
-        self.anjian_host = '15.29.32.3'
-        #self.weiqi_host = '15.29.32.61'
-        self.jianceleibie = u'在用机动车检验'
-    def carreg(self):#查询carreg数据
-        conn = pymssql.connect(self.anjian_host, 'sa', 'svrcomputer', 'NewGaJck_TB')
-        jieguo = {}
-        cursor = conn.cursor(as_dict=True)
-        cursor.execute('SELECT JCZT,ReTest FROM carreg WHERE CPH=%s AND PZLBID=%s',
-                       (self.chepai_wanzheng, self.chepai_leibie))
-        # cursor.execute('SELECT * FROM ufee WHERE CPH=%s AND PZLBID=%s',(paizhaohao,paizhaoleibie_id))
-        for i in cursor:
-            jieguo['jczt'] = i.get('JCZT')
-            jieguo['retest'] = i.get('ReTest')
-        # print qs_num
-        conn.close()
-        if len(jieguo) == 0:
-            return 'kong'
-        chujianorfujian = jieguo.get('retest')#初检或者复检
-        if chujianorfujian == 0:
-            return u'初检'+' '+jieguo.get('jczt')
-        elif chujianorfujian > 0:
-            return u'复检'+ ' ' + jieguo.get('jczt')
-
-
-    def CarDetInfo(self):#查询cardetinfo数据
-        today = datetime.date.today()
-        conn = pymssql.connect(self.anjian_host, 'sa', 'svrcomputer', 'NewGaJck_TB')
-        jclsh_list = []
-        cursor = conn.cursor(as_dict=True)
-        cursor.execute('SELECT JCLSH FROM cardetinfo WHERE CPH=%s AND PZLBID=%s',
-                       (self.chepai_wanzheng, self.chepai_leibie))
-        # cursor.execute('SELECT * FROM ufee WHERE CPH=%s AND PZLBID=%s',(paizhaohao,paizhaoleibie_id))
-        for i in cursor:
-            jclsh_list.append(i.get('JCLSH'))
-        conn.close()
-        if len(jclsh_list) == 0:
-            return 'kong'
-        else:
-            return_dic = self.getnewjclsh(jclsh_list)
-            shijiancha = today - return_dic.get('date')
-            if shijiancha > datetime.timedelta(days=30):
-                return 'kong'
-            else:
-                return return_dic.get('jclsh')
-
-
-    def JcBase(self,jclsh):
-        jieguo_shuchu = []
-        fanhui_list = []
-        #jiancexiangmu_poingjia = {'Exa_SpeedEvl':u'速度','Exa_SlideEvl':u'侧滑','Exa_Brake1Evl':u'一轴制动',
-                                  #'Exa_Brake2Evl':u'二轴制动','Exa_Brake3Evl':u'三轴制动','Exa_Brake4Evl':u'四轴制动',
-                                  #'Exa_Brake5Evl':u'五轴制动','Exa_Brake6Evl':u'六轴制动','Exa_BrakeSEvl':u'驻车制动',
-                                  #'Exa_BrakeZCEvl':u'整车制动','Exa_LightInLEvl':u'左副灯','Exa_LightInREvl':u'右副灯',
-                                  #'Exa_LightOutLEvl':u'左主灯','Exa_LightOutREvl':u'右主灯','Exa_LightNearLEvl':u'左近光灯',
-                                  #'Exa_LightNearREvl':u'右近光灯','Exa_OutCheckEvl':u'外检','Exa_DTCheckEvl':u'动态',
-                                  #'Exa_DGCheckEvl':u'地沟','Exa_Evl':u'总检'}
-        jiancexiangmu_pingjia = {'Evl':u'总检','Speed':u'速度','Slide':u'侧滑','Brake1':u'一轴制动','Brake2':u'二轴制动',
-                                 'Brake3':u'三轴制动','Brake4':u'四轴制动','Brake5':u'五轴制动','Brake6':u'六轴制动',
-                                 'BrakeS1':u'一轴驻车制动','BrakeS2':u'二轴驻车制动','BrakeS3':u'三轴驻车制动',
-                                 'BrakeS4':u'四轴驻车制动','BrakeS5':u'五轴驻车制动','BrakeS6':u'六轴驻车制动',
-                                 'BrakeS':u'整车驻车制动','BrakeZC':u'整车制动','LightInL':u'左副灯','LightInR':u'右副灯',
-                                 'LightOutL':u'左主灯','LightOutR':u'右主灯','LightNearL':u'左近光灯','LightNearR':u'右近光灯',
-                                 'OutCheckEvl':u'外检','DTCheckEvl':u'动态','DGCheckEvl':u'地沟',}
-        conn = pymssql.connect(self.anjian_host, 'sa', 'svrcomputer', 'NewGaJck_TB')
-        jieguo = {}
-        cursor = conn.cursor()
-        cursor.execute('SELECT MAX(JCMaxNum) FROM jcbase WHERE JCLSH = %s', (jclsh))#对多次检测的获取最后一次
-        zuidashu = cursor.fetchall()[0][0]
-        cursor = conn.cursor(as_dict=True)
-        #cursor.execute('SELECT Exa_SpeedEvl,Exa_SlideEvl,Exa_Brake1Evl,Exa_Brake2Evl,Exa_Brake3Evl,Exa_Brake4Evl,Exa_Brake5Evl,Exa_Brake6Evl,Exa_BrakeSEvl,Exa_BrakeZCEvl,Exa_LightInLEvl,Exa_LightInREvl,Exa_LightOutLEvl,Exa_LightOutREvl,Exa_LightNearLEvl,Exa_LightNearREvl,Exa_OutCheckEvl,Exa_DTCheckEvl,Exa_DGCheckEvl,Exa_Evl FROM examine WHERE JCLSH = %s',(jclsh))
-        cursor.execute('SELECT Evl,Speed,Slide,Brake1,Brake2,Brake3,Brake4,Brake5,Brake6,BrakeS1,BrakeS2,BrakeS3,BrakeS4,BrakeS5,BrakeS6,BrakeS,BrakeZC,LightInL,LightInR,LightOutL,LightOutR,LightNearL,LightNearR,OutCheckEvl,DTCheckEvl,DGCheckEvl FROM jcbase WHERE JCLSH = %s AND JCMaxNum = %s',(jclsh,zuidashu))
-
-        # cursor.execute('SELECT * FROM ufee WHERE CPH=%s AND PZLBID=%s',(paizhaohao,paizhaoleibie_id))
-        for i in cursor:#查询结果总检项为T则返回检测合格
-            if i.get('Evl') == 'T':
-                return 'jiancehege'
-            else:#总检不合格的将不合格项加入列表
-                for a in i:
-                    if i.get(a).find('F') != -1:
-                        jieguo_shuchu.append(a)
-                jieguo_shuchu.remove('Evl')
-        for i in jieguo_shuchu:
-            fanhui_list.append(jiancexiangmu_pingjia.get(i))
-        fanhui_str = ','.join(fanhui_list)
-        conn.close()
-        return fanhui_str
-    def zhizheng(self):#查询制证日期
-        zhizhengriqi = datetime.datetime.now()
-        qs = DX_Xingshizheng.objects.filter(paizhaohao=self.chepai_wanzheng,
-                                            cheliangleibie_id=self.chepai_leibie).order_by('-chuanjianriqi')
-        if len(qs) == 0:#没有查询到结果
-            return 'kong'
-        elif len(qs) != 0:
-            zhizhengriqi = qs[0].chuanjianriqi#创建日期
-        today = datetime.datetime.now()
-        shijiancha = today - zhizhengriqi
-        if shijiancha > datetime.timedelta(days=30):
-            return 'kong'
-        else:
-            return str(zhizhengriqi)[:19]#时间戳截断返回字符串
-
-    def getnewjclsh(self,jclsh_list):
-            # 获得车辆最近的流水号，注意：至少传入一个流水号
-        return_list = []
-        for i in jclsh_list:
-            dic = {}
-            year, mon, day, sn, jclsh = int(i[2:6]), int(i[6:8]), int(i[8:10]), int(i[10:]), i
-            try:
-                date = datetime.date(year, mon, day)
-            except:
-                print 'riqigeshibufu'
-            dic['date'] = date
-            dic['sn'] = sn
-            dic['jclsh'] = jclsh
-            return_list.append(dic)
-        df = pd.DataFrame(return_list)
-        df1 = df.sort(['date', 'sn'], ascending=[True, True])
-        return_dic = {}
-        df1_todic = df1[len(df1) - 1:].to_dict('records')[0]
-        return_dic['date'] = date
-        return_dic['jclsh'] = df1_todic.get('jclsh')
-        return return_dic
-
-    '''
-    如果检测队列中有车辆信息则直接显示检测队列中的信息，如果检测队列中没有则通过查询cardetinfo得到jclsh 查询jcbase中的车辆信息并返回合格或不合格，
-    如果合格则查询制证表中是否有记录，如果不合格则返回不合格提示并输出不合格项目提示复检，
-    '''
-    def panduan(self):
-        carreg = self.carreg()
-        if carreg != 'kong':
-            return {'zhuangtai':'denglu','neirong':carreg}
-        elif carreg == 'kong':
-            cardetinfo = self.CarDetInfo()
-            if cardetinfo == 'kong':
-                return {'zhuangtai':'weibanli'}
-            elif cardetinfo != 'kong':
-                jcbase = self.JcBase(cardetinfo)
-                if jcbase == 'jiancehege':
-                    zhizheng = self.zhizheng()
-                    if zhizheng == 'kong':
-                        return {'zhuangtai':'dengdaizhizheng'}
-                    elif zhizheng != 'kong':
-                        return {'zhuangtai':'yibanjie','neirong':zhizheng}
-                elif jcbase != 'jiancehege':
-                    return {'zhuangtai':'anjian_buhege','neirong':jcbase}
+def yanzhengnexttime(nexttimestr):#验证传入的下次检测时期是不是正确的格式，应该为'201808'
+    if len(nexttimestr) != 6:
+        return JsonResponse({'chenggong':False,'cuowu':u'下次检验时间格式长度不正确'})
+    nexttime_year = int(nexttimestr[:4])
+    nexttime_month = int(nexttimestr[4:])
+    try:
+        datetime.date(nexttime_year,nexttime_month,1)
+    except:
+        return JsonResponse({'chenggong':False,'cuowu':u'下次检验时间格式不正确'})
+    return True
 
 class weiqi_zhuangtaichaxun:#尾气状态查询
 
