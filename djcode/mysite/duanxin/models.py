@@ -224,6 +224,23 @@ class DX_CustomerFile(models.Model):
                             anjianshoufei=anjianshoufei,weiqishoufei=weiqishoufei,heji=anjianshoufei+weiqishoufei,
                             tuijianren=tuijianren,banliriqi=datetime.datetime.now(),czry_user=czry_user,czry=czry)
         q.save()
+    def jiaochaSearch(self,qsList):
+        for i in qsList:
+            carinfo = self.carinfoSearch(i['paizhaohao'],i['cheliangleibie_id'])
+            i['dipanhao'] = carinfo.get('dipanhao')
+            i['chezhu'] = carinfo.get('chezhu')
+        return qsList
+    def carinfoSearch(self,paizhaohao,cheliangleibie_id):
+        dic = {}
+        print paizhaohao,cheliangleibie_id
+        qs = DX_CarInfo.objects.filter(paizhaohao=paizhaohao,paizhaoleibie_id=cheliangleibie_id).order_by('-chuanjianriqi')
+        if qs:
+           dic['dipanhao'] = qs[0].dipanhao
+           dic['chezhu'] = qs[0].chezhu
+        else:
+            dic['dipanhao'] = ''
+            dic['chezhu'] = ''
+        return dic
 
 
 
