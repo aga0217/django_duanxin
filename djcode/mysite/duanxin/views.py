@@ -1573,8 +1573,9 @@ def dangansearch(requset):
         if jczid is None:
             return JsonResponse({'chenggong': False, 'cuowu': u'没有找到检测站编号'})
         cph = jieshou_json.get('cph')
-        if not cph :
-            return JsonResponse({'chenggong':False,'cuowu':u'没有找到车牌号信息'})
+        #print 'cph',cph
+        #if not cph :
+            #return JsonResponse({'chenggong':False,'cuowu':u'没有找到车牌号信息'})
         danganzhonglei = jieshou_json.get('danganzhonglei')
         if not danganzhonglei:
             return JsonResponse({'chenggong':False,'cuowu':u'没有档案种类'})
@@ -1588,7 +1589,7 @@ def dangansearch(requset):
             return JsonResponse({'chenggong':False,'cuowu':u'没有找到datetime'})
         if danganzhonglei == 'customerfile':
             agve = {}
-
+            is_jiaocha = jieshou_json.get('is_jiaocha')
             if is_datetime == True:
                 try:
                     starttime = datetime.datetime.strptime(jieshou_json['is_datetime_start'],"%Y-%m-%d")
@@ -1603,9 +1604,13 @@ def dangansearch(requset):
                 agve['paizhaohao__icontains'] = cph
             qs = list(DX_CustomerFile.objects.filter(jczid=jczid,isdel=False).filter(**agve).values('id','paizhaohao','cheliangleibie_str',
                                                                                                'chezhudianhua','banliriqi','anjianshoufei',
-                                                                                               'weiqishoufei','heji','tuijianren'))
+                                                                                               'weiqishoufei','heji','tuijianren',
+                                                                                                    'cheliangleibie_id'))
             if not qs:
                 return JsonResponse({'chenggong': True, 'data': {'qs': None}})
+            if is_jiaocha:
+                qs = DX_CustomerFile().jiaochaSearch(qs)
+            print qs
             return JsonResponse({'chenggong': True, 'data': {'qs': qs}})
         if danganzhonglei == 'carinfo':
             agve = {}
@@ -1625,6 +1630,20 @@ def dangansearch(requset):
             if nexttime !='':
                 if yanzhengnexttime(nexttime):
                     agve['next_riqi'] = nexttime
+            #判断检测次数表达式
+            biaoda = jieshou_json.get('biaoda')
+            jccs = jieshou_json.get('jccs')
+            if biaoda != '--' and jccs != '':
+                if biaoda == '>':
+                    agve['jiancecishu__gt'] = int(jccs)
+                elif biaoda == '>=':
+                    agve['jiancecishu__gte'] = int(jccs)
+                elif biaoda == '<':
+                    agve['jiancecishu__lt'] = int(jccs)
+                elif biaoda == '<=':
+                    agve['jiancecishu__lte'] = int(jccs)
+                elif biaoda == '=':
+                    agve['jiancecishu'] = int(jccs)
             qs =list(DX_CarInfo.objects.filter(iswanzheng=True).filter(**agve).values('id','paizhaohao','paizhaoleibie_str',
                                                                                       'dipanhao','next_riqi','chuanjianriqi',
                                                                                       'jiancecishu','chezhu'))
