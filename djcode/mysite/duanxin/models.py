@@ -2,6 +2,8 @@
 from django.db import models
 import datetime
 #import pgcryptof
+import requests
+import json
 from jiami_jiemi_test import AESCipher
 
 class DX_FaSongMX(models.Model):#短信发送明细
@@ -255,6 +257,47 @@ class DX_CustomerFile(models.Model):
         else:
             dic['tjr'] = None
         return dic
+
+class Dx_TellNumCount(models.Model):
+    jczid = models.CharField(max_length=5, verbose_name=u'检测站id')
+    tellnum = models.CharField(max_length=15,verbose_name=u'电话号码')
+    tellnumcount = models.IntegerField(default=0,verbose_name=u'出现次数')
+
+    def guishudi(self,tellnum):
+        url = "https://way.jd.com/jisuapi/query4?shouji="+tellnum+"&appkey=f2a58b43cdc3bdfd31962fdf87b9dd88"
+        try:
+            resp = requests.get(url,timeout=2)
+        except:
+            guishudi = u'resp错误'
+            return guishudi
+        result_rep = resp.content
+        try:
+            result = json.loads(result_rep)
+        except:
+            guishudi = u'json cuowu'
+            return guishudi
+        if result.get('code') != '10000':
+            guishudi = result.get('msg')
+            return guishudi
+        guishudi = result.get('result').get('result').get('province')
+        return guishudi
+
+    def count(self,jczid,tellnum):
+        qs = Dx_TellNumCount.objects.filter(jczid=jczid,tellnum=tellnum)
+        if qs.exists():#如果电话存在则加一
+            cishu = qs[0].tellnumcount
+            qs.update(tellnumcount=cishu+1)
+            return cishu
+        else:#不存在则 添加
+            qs = Dx_TellNumCount(jczid=jczid,tellnum=tellnum,tellnumcount=1)
+            qs.save()
+            return 1
+
+    def veriftell(self,jczid,tellnum):
+        cishu = self.count(jczid,tellnum)
+        guishudi = self.guishudi(tellnum)
+        return {'guishudi':guishudi,'cishu':cishu}
+
 
 
 

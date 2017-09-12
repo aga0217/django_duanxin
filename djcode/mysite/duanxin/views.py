@@ -1092,6 +1092,44 @@ def searchtell(requset):
             tjr = numAndTjr.get('tjr')
             return JsonResponse({'chenggong': True, 'data':{'dianhua':dianhua,'tjr':tjr}})
 
+def veriftellnum(requset):
+    if requset.method == 'POST':
+        try:
+            ip = requset.META['REMOTE_ADDR']
+        except:
+            return JsonResponse({'chenggong': False, 'cuowu': u'IP地址不匹配'})
+        if ip not in ip_yunxu:
+            return JsonResponse({'chenggong': False, 'cuowu': u'%s访问地址不匹配02' % ip})
+        # 处理json
+        try:
+            jieshou_json = json.loads(requset.body)
+        except ValueError:
+            return JsonResponse({'chenggong': False, 'cuowu': u'数据格式不对'})
+        jczid = jieshou_json.get('jczid')
+        if jczid is None:
+            return JsonResponse({'chenggong': False, 'cuowu': u'没有找到检测站编号'})
+        czry_user = jieshou_json.get('czry')  # 操作人员用户名
+        if czry_user is None:
+            return JsonResponse({'chenggong': False, 'cuowu': u'没有找到操作人员用户名'})
+        czry_pass = jieshou_json.get('czry_pass')
+        if czry_pass is None:
+            return JsonResponse({'chenggong': False, 'cuowo': u'没有找到操作人员密码'})
+        tellNum = jieshou_json.get('tellnum')
+        if tellNum is None:
+            return JsonResponse({'chenggong':False,'cuowu':u'没有找到电话号码'})
+        yanzheng = DX_ShouFei_UserName().UserDengLu(czry_user,czry_pass)
+        if yanzheng.get('denglu') != True:
+            return JsonResponse({'chenggong':False,'cuowu':yanzheng.get('cuowu')})
+        vertell = Dx_TellNumCount().veriftell(jczid,tellNum)
+        if vertell:
+            return JsonResponse({'chenggong':True,'data':vertell})
+        else:
+            return JsonResponse({'chenggong':False,'cuowu':u'vertell返回空值'})
+    else:
+        return JsonResponse({'chenggong':False,'cuowu':'500'})
+
+
+
 def JieZhangYulan(requset):#结账预览
     if requset.method == 'POST':
         # 验证IP地址
@@ -1586,7 +1624,7 @@ def dangansearch(requset):
         danganzhonglei_list = ['customerfile','carinfo']
         #if danganzhonglei != 'customerfile' or danganzhonglei != 'carinfo':
         if danganzhonglei not in danganzhonglei_list:
-            print 'danganzhonglei',danganzhonglei
+            #print 'danganzhonglei',danganzhonglei
             return JsonResponse({'chenggong':False,'cuowu':u'档案种类标示不正确'})
         is_datetime = jieshou_json.get('is_datetime')
         if is_datetime == None:
@@ -1614,7 +1652,7 @@ def dangansearch(requset):
                 return JsonResponse({'chenggong': True, 'data': {'qs': None}})
             if is_jiaocha:
                 qs = DX_CustomerFile().jiaochaSearch(qs)
-            print qs
+            #print qs
             return JsonResponse({'chenggong': True, 'data': {'qs': qs}})
         if danganzhonglei == 'carinfo':
             agve = {}
@@ -1654,12 +1692,6 @@ def dangansearch(requset):
             if not qs:
                 return JsonResponse({'chenggong': True, 'data': {'qs': None}})
             return JsonResponse({'chenggong': True, 'data': {'qs': qs}})
-
-
-
-
-
-
     else:
         return JsonResponse({'chenggong': False, 'cuowu': '500'})
 
