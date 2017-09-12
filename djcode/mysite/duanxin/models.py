@@ -230,9 +230,9 @@ class DX_CustomerFile(models.Model):
             i['dipanhao'] = carinfo.get('dipanhao')
             i['chezhu'] = carinfo.get('chezhu')
         return qsList
+
     def carinfoSearch(self,paizhaohao,cheliangleibie_id):
         dic = {}
-        print paizhaohao,cheliangleibie_id
         qs = DX_CarInfo.objects.filter(paizhaohao=paizhaohao,paizhaoleibie_id=cheliangleibie_id).order_by('-chuanjianriqi')
         if qs:
            dic['dipanhao'] = qs[0].dipanhao
@@ -241,6 +241,22 @@ class DX_CustomerFile(models.Model):
             dic['dipanhao'] = ''
             dic['chezhu'] = ''
         return dic
+
+    def searchtelandtjr(self,paizhaohao,cheliangleibie_id):
+        dic = {}
+        qs = DX_CarInfo.objects.filter(paizhaohao=paizhaohao,paizhaoleibie_id=cheliangleibie_id).order_by('-chuanjianriqi')
+        if qs:
+            dic['dianhua'] = qs[0].dianhua
+        else:
+            dic['dianhua'] = None
+        qs = DX_CustomerFile.objects.filter(paizhaohao=paizhaohao,cheliangleibie_id=cheliangleibie_id).order_by('-banliriqi')
+        if qs:
+            dic['tjr'] = qs[0].tuijianren
+        else:
+            dic['tjr'] = None
+        return dic
+
+
 
 
 
