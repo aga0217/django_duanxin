@@ -675,7 +675,7 @@ def jieguo_to_excel(jieguo_df,chaxun_or_duibi):
     datetime.date.today().strftime("%Y%m%d") + str(random.randint(1, 10000)))
     path = settings.MEDIA_ROOT + "/file/%s.xls" % temp_name
     path_return = "/media/file/%s.xls" % temp_name
-    print path_return
+    #print path_return
     if chaxun_or_duibi == 'shoufei_zhizheng_duibi':
         df = pd.DataFrame(jieguo_df)
         del df['xuhao']
@@ -824,7 +824,7 @@ def webservice_shoufei(requset):#收费webserices
         data = jieshou_json.get('data')
         if data is None:
             return JsonResponse({'chenggong':False,'cuowu':u'没有找到操作数据'})
-        print 'tuijianren:'+tuijianren
+        #print 'tuijianren:'+tuijianren
         if tuijianren:
             try:
                 anjianshoufei = data.get('anjian').get('jfje')
@@ -1081,12 +1081,16 @@ def searchtell(requset):
         yanzheng = DX_ShouFei_UserName().UserDengLu(czry_user,czry_pass)
         if yanzheng.get('denglu') != True:
             return JsonResponse({'chenggong':False,'cuowu':yanzheng.get('cuowu')})
-        qs = DX_CarInfo.objects.filter(paizhaohao=paizhaohao,paizhaoleibie_id=cheliangleibie_id)
-        if not qs:
-            return JsonResponse({'chenggong': True, 'data':{'dianhua':None}})
+        #qs = DX_CarInfo.objects.filter(paizhaohao=paizhaohao,paizhaoleibie_id=cheliangleibie_id)
+        numAndTjr = DX_CustomerFile().searchtelandtjr(paizhaohao,cheliangleibie_id)
+        if not numAndTjr:
+            return JsonResponse({'chenggong': False, 'cuowu':u'numAndTjr查询返回空值'})
         else:
-            dianhua = AESCipher().decrypt(qs[0].dianhua)
-            return JsonResponse({'chenggong': True, 'data':{'dianhua':dianhua}})
+            dianhua = numAndTjr.get('dianhua')
+            if dianhua:
+                dianhua = AESCipher().decrypt(dianhua)
+            tjr = numAndTjr.get('tjr')
+            return JsonResponse({'chenggong': True, 'data':{'dianhua':dianhua,'tjr':tjr}})
 
 def JieZhangYulan(requset):#结账预览
     if requset.method == 'POST':
