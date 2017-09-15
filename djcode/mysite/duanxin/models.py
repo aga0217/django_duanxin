@@ -258,13 +258,19 @@ class DX_CustomerFile(models.Model):
             dic['tjr'] = None
         return dic
 
+    def deldangan(self,id_list):
+        qs = DX_CustomerFile.objects.filter(id__in=id_list)
+        qs.update(isdel = True)
+        return True
+
 class Dx_TellNumCount(models.Model):
     jczid = models.CharField(max_length=5, verbose_name=u'检测站id')
     tellnum = models.CharField(max_length=15,verbose_name=u'电话号码')
     tellnumcount = models.IntegerField(default=0,verbose_name=u'出现次数')
 
     def guishudi(self,tellnum):
-        url = "https://way.jd.com/jisuapi/query4?shouji="+tellnum+"&appkey=f2a58b43cdc3bdfd31962fdf87b9dd88"
+        #url = "https://way.jd.com/jisuapi/query4?shouji="+tellnum+"&appkey=f2a58b43cdc3bdfd31962fdf87b9dd88"
+        url = 'https://way.jd.com/shujujia/mobile?mobile='+tellnum+'&appkey=f2a58b43cdc3bdfd31962fdf87b9dd88'
         try:
             resp = requests.get(url,timeout=2)
         except:
@@ -279,7 +285,7 @@ class Dx_TellNumCount(models.Model):
         if result.get('code') != '10000':
             guishudi = result.get('msg')
             return guishudi
-        guishudi = result.get('result').get('result').get('province')
+        guishudi = result.get('result').get('province')
         return guishudi
 
     def count(self,jczid,tellnum):

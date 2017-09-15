@@ -1695,6 +1695,30 @@ def dangansearch(requset):
     else:
         return JsonResponse({'chenggong': False, 'cuowu': '500'})
 
+def deldangan(requset):
+    if requset.method == 'POST':
+        # 验证IP地址
+        try:
+            ip = requset.META['REMOTE_ADDR']
+        except:
+            return JsonResponse({'chenggong': False, 'cuowu': u'IP地址不匹配'})
+        if ip not in ip_yunxu:
+            return JsonResponse({'chenggong': False, 'cuowu': u'%s访问地址不匹配02' % ip})
+        # 处理json
+        try:
+            jieshou_json = json.loads(requset.body)
+        except ValueError:
+            return JsonResponse({'chenggong': False, 'cuowu': u'数据格式不对'})
+        jczid = jieshou_json.get('jczid')
+        if jczid is None:
+            return JsonResponse({'chenggong': False, 'cuowu': u'没有找到检测站编号'})
+        id_list = jieshou_json.get('id_list')
+        if not id_list:
+            return JsonResponse({'chenggong':False,'cuowu':u'没有找到idlist'})
+        if DX_CustomerFile().deldangan(id_list):
+            return JsonResponse({'chenggong':True,'data':{'qs':'wancheng'}})
+
+
 def yanzhengnexttime(nexttimestr):#验证传入的下次检测时期是不是正确的格式，应该为'201808'
     if len(nexttimestr) != 6:
         return JsonResponse({'chenggong':False,'cuowu':u'下次检验时间格式长度不正确'})
