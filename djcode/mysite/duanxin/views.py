@@ -1644,10 +1644,10 @@ def dangansearch(requset):
                 agve['banliriqi__range'] = (starttime, endtime)
             if cph != '':
                 agve['paizhaohao__icontains'] = cph
-            qs = list(DX_CustomerFile.objects.filter(jczid=jczid,isdel=False).filter(**agve).values('id','paizhaohao','cheliangleibie_str',
+            qs = list(DX_CustomerFile.objects.filter(jczid=jczid,isdel=False).filter(**agve).order_by('id').values('id','paizhaohao','cheliangleibie_str',
                                                                                                'chezhudianhua','banliriqi','anjianshoufei',
                                                                                                'weiqishoufei','heji','tuijianren',
-                                                                                                    'cheliangleibie_id'))
+                                                                                                    'cheliangleibie_id','beizhu'))
             if not qs:
                 return JsonResponse({'chenggong': True, 'data': {'qs': None}})
             if is_jiaocha:
@@ -1729,6 +1729,132 @@ def yanzhengnexttime(nexttimestr):#验证传入的下次检测时期是不是正
     except:
         return JsonResponse({'chenggong':False,'cuowu':u'下次检验时间格式不正确'})
     return True
+
+def readdangan(requset):
+    if requset.method == 'POST':
+        # 验证IP地址
+        try:
+            ip = requset.META['REMOTE_ADDR']
+        except:
+            return JsonResponse({'chenggong': False, 'cuowu': u'IP地址不匹配'})
+        if ip not in ip_yunxu:
+            return JsonResponse({'chenggong': False, 'cuowu': u'%s访问地址不匹配02' % ip})
+        # 处理json
+        try:
+            jieshou_json = json.loads(requset.body)
+        except ValueError:
+            return JsonResponse({'chenggong': False, 'cuowu': u'数据格式不对'})
+        jczid = jieshou_json.get('jczid')
+        if jczid is None:
+            return JsonResponse({'chenggong': False, 'cuowu': u'没有找到检测站编号'})
+        id = jieshou_json.get('id')
+        if not id:
+            return JsonResponse({'chenggong':False,'cuowu':u'没有找到id'})
+        danganzhonglei = jieshou_json.get('danganzhonglei')
+        if danganzhonglei is None:
+            return JsonResponse({'chenggong':False,'cuowu':u'没有找到档案种类'})
+        if danganzhonglei == 'customerfile':
+            qs = list(DX_CustomerFile.objects.filter(jczid=jczid,id=id).values('paizhaohao','cheliangleibie_id','cheliangleibie_str',
+                                                                               'chezhudianhua','banliriqi','tuijianren','weiqishoufei',
+                                                                               'anjianshoufei','heji','beizhu'))
+            if not qs:
+                return JsonResponse({'chenggong': True, 'data': {'qs': None}})
+            return JsonResponse({'chenggong': True, 'data': {'qs': qs}})
+
+def updatedangan(requset):
+
+        if requset.method == 'POST':
+            # 验证IP地址
+            try:
+                ip = requset.META['REMOTE_ADDR']
+            except:
+                return JsonResponse({'chenggong': False, 'cuowu': u'IP地址不匹配'})
+            if ip not in ip_yunxu:
+                return JsonResponse({'chenggong': False, 'cuowu': u'%s访问地址不匹配02' % ip})
+            # 处理json
+            try:
+                jieshou_json = json.loads(requset.body)
+            except ValueError:
+                return JsonResponse({'chenggong': False, 'cuowu': u'数据格式不对'})
+            jczid = jieshou_json.get('jczid')
+            if jczid is None:
+                return JsonResponse({'chenggong': False, 'cuowu': u'没有找到检测站编号'})
+            id = jieshou_json.get('id')
+            if not id:
+                return JsonResponse({'chenggong': False, 'cuowu': u'没有找到id'})
+            danganzhonglei = jieshou_json.get('danganzhonglei')
+            if danganzhonglei is None:
+                return JsonResponse({'chenggong': False, 'cuowu': u'没有找到档案种类'})
+            beizhu = jieshou_json.get('beizhu')
+            tuijianren = jieshou_json.get('tjr')
+            dianhua = jieshou_json.get('dianhua')
+            if danganzhonglei == 'customerfile':
+                update = DX_CustomerFile().updatedangan(jczid,id,beizhu,tuijianren,dianhua)
+                if update.get('chenggong') == True:
+                    return JsonResponse({'chenggong':True,'data':{'qs':None}})
+                else:
+                    return JsonResponse({'chenggong':False,'cuowu':update.get('cuowu')})
+
+def getrecommenderlist(requset):
+    if requset.method == 'POST':
+        # 验证IP地址
+        try:
+            ip = requset.META['REMOTE_ADDR']
+        except:
+            return JsonResponse({'chenggong': False, 'cuowu': u'IP地址不匹配'})
+        if ip not in ip_yunxu:
+            return JsonResponse({'chenggong': False, 'cuowu': u'%s访问地址不匹配02' % ip})
+        # 处理json
+        try:
+            jieshou_json = json.loads(requset.body)
+        except ValueError:
+            return JsonResponse({'chenggong': False, 'cuowu': u'数据格式不对'})
+        jczid = jieshou_json.get('jczid')
+        if jczid is None:
+            return JsonResponse({'chenggong': False, 'cuowu': u'没有找到检测站编号'})
+        recommenderlist = Dx_Recommender().getrecommenderlist(jczid)
+        if recommenderlist.get('chenggong'):
+            recommenderlist = recommenderlist.get('data')
+            if len(recommenderlist) != 0:
+                return JsonResponse({'chenggong':True,'data':{'recommenderlist':recommenderlist}})
+            else:
+                return JsonResponse({'chenggong':True,'data':{'recommenderlist':['']}})
+
+def addrecommender(requset):
+    if requset.method == 'POST':
+        # 验证IP地址
+        try:
+            ip = requset.META['REMOTE_ADDR']
+        except:
+            return JsonResponse({'chenggong': False, 'cuowu': u'IP地址不匹配'})
+        if ip not in ip_yunxu:
+            return JsonResponse({'chenggong': False, 'cuowu': u'%s访问地址不匹配02' % ip})
+        # 处理json
+        try:
+            jieshou_json = json.loads(requset.body)
+        except ValueError:
+            return JsonResponse({'chenggong': False, 'cuowu': u'数据格式不对'})
+        jczid = jieshou_json.get('jczid')
+        if jczid is None:
+            return JsonResponse({'chenggong': False, 'cuowu': u'没有找到检测站编号'})
+        name = jieshou_json.get('name')
+        re_name = ur"^[\u4E00-\u9FA5]+$"
+        if not re.match(re_name, name):
+            return JsonResponse({'chenggong':False,'cuowu':u'姓名只能输入中文'})
+        tellnumberinput = jieshou_json.get('tellnumber')
+        re_number =ur"^[0-9]+$"
+        if re.match(re_number,tellnumberinput) and tellnumberinput[0] == '1' and len(tellnumberinput) == 11:
+            tellnumber = tellnumberinput
+        else:
+            return JsonResponse({'chenggong':False,'cuowu':u'电话号码不正确'})
+        q = Dx_Recommender().addrecommender(jczid,name,tellnumber)
+        if q.get('chenggong') == True:
+            return JsonResponse({'chenggong':True,'data':{'chenggong':True}})
+        else:
+            return JsonResponse({'chenggong':False,'cuowu':q.get('cuowu')})
+
+
+
 
 class weiqi_zhuangtaichaxun:#尾气状态查询
 

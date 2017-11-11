@@ -24,6 +24,7 @@ class DX_FaSongMX(models.Model):#短信发送明细
     next_riqi = models.CharField(max_length=6,verbose_name=u'下次年检日期',null=True)
     gongyingshang = models.CharField(max_length=100,verbose_name=u'短信供应商',null=True)
     paizhaoleibie_id = models.CharField(max_length=30, verbose_name=u'牌照类别ID', null=True)#对应'PZLBID'
+    tjrcount = models.IntegerField(verbose_name=u'推荐人本月推荐计数',null=True)
 
 
 class DX_CarInfo(models.Model):
@@ -130,10 +131,11 @@ class DX_ShouFei(models.Model):
 
             if not qs:#qs为空
                 return {'chenggong': False, 'cuowu': u'没有找到指定ID'}
-            if qs[0].is_tuikuan == True or qs[0].is_kaifapiao == True:
+            if qs[0].is_tuikuan == True or qs[0].is_kaifapiao == True:#已经标记开票的不允许退款
                 return {'chenggong':False,'cuowu':u'该车已经退款或者已经开具发票'}
             qs.update(is_tuikuan=True,bjr=yanzheng.get('user_str'),bjr_username=yanzheng.get('username'),
                           tuikuan_riqi=datetime.datetime.now())
+            self.deleteCustomerFile(id)#同时删除客服档案（指定当天的同一车牌同一车辆类型的车辆）
             jczid = qs[0].jczid
             cph = qs[0].paizhaohao
             pzlb_int = qs[0].cheliangleibie_id
@@ -157,11 +159,25 @@ class DX_ShouFei(models.Model):
 
 
 
+
         else:
             return {'chenggong':False,'cuowu':u'没有通过验证或没有退款权限'}
 
+    def deleteCustomerFile(self,id):
+        qs = DX_ShouFei.objects.get(id=id)
+        day = qs.skrq.day
+        month = qs.skrq.month
+        year = qs.skrq.year
+        paizhaohao = qs.paizhaohao
+        cheliangleibie_id = qs.cheliangleibie_id
+        qs_update = DX_CustomerFile.objects.filter(paizhaohao=paizhaohao,cheliangleibie_id=cheliangleibie_id,
+                                                   banliriqi__day=day,banliriqi__month=month,
+                                                   banliriqi__year=year)
+        qs_update.update(isdel = True)
 
-    #TODO:标记开票的不允许退款
+
+
+
 
 class DX_ShouFei_UserName(models.Model):
     username = models.CharField(max_length=30,verbose_name=u'用户名')
@@ -217,8 +233,21 @@ class DX_CustomerFile(models.Model):
     isdel = models.BooleanField(default=False,verbose_name=u'是否被删除')
     czry_user = models.CharField(max_length=256,verbose_name=u'操作人用户名')
     czry = models.CharField(max_length=256,verbose_name=u'操作人员姓名')
+    beizhu = models.CharField(max_length=512,verbose_name=u'备注',null=True)
 
-
+    def savesms(self,paizhaohao,jczid,tuijianren):
+        q = DX_FaSongMX(paizhaohao=paizhaohao, tijiao_datetime=datetime.datetime.now(),
+                        dianhuahao=self.gettell(jczid,tuijianren),
+                        tjrcount=self.tjrcount(jczid,tuijianren),
+                        yincheyuan_name=u'空', yincheyuan_dianhua=u'空', fasongjiekou='tixing_tjr', is_delete=False)
+        q.save()
+    def gettell(self,jczid,tuijianren):
+        qs = Dx_Recommender.objects.filter(jczid=jczid,name=tuijianren)
+        return qs[0].tellnumber
+    def tjrcount(self,jczid,tuijianren):
+        today = datetime.date.today()
+        qs = DX_CustomerFile.objects.filter(jczid=jczid,tuijianren=tuijianren,banliriqi__month=today.month)
+        return len(qs)
     def addcustomerfile(self,jczid,paizhaohao,cheliangleibie_id,cheliangleibie_str,chezhudianhua,
                         anjianshoufei,weiqishoufei,tuijianren,czry_user,czry):
         q = DX_CustomerFile(jczid=jczid,paizhaohao=paizhaohao,cheliangleibie_id=cheliangleibie_id,
@@ -226,6 +255,7 @@ class DX_CustomerFile(models.Model):
                             anjianshoufei=anjianshoufei,weiqishoufei=weiqishoufei,heji=anjianshoufei+weiqishoufei,
                             tuijianren=tuijianren,banliriqi=datetime.datetime.now(),czry_user=czry_user,czry=czry)
         q.save()
+        self.savesms(paizhaohao,jczid,tuijianren)
     def jiaochaSearch(self,qsList):
         for i in qsList:
             carinfo = self.carinfoSearch(i['paizhaohao'],i['cheliangleibie_id'])
@@ -263,12 +293,33 @@ class DX_CustomerFile(models.Model):
         qs.update(isdel = True)
         return True
 
+    def updatedangan(self,jczid,id,beizhu,tuijianren,dianhua):
+        qs = DX_CustomerFile.objects.filter(jczid=jczid,id=id)
+        if qs.exists():
+            qs.update(beizhu=beizhu, tuijianren=tuijianren,chezhudianhua=dianhua)
+            paizhaohao = qs[0].paizhaohao
+            paizhaoleibie_id = qs[0].cheliangleibie_id
+            self.updatecarinfo_tell(paizhaohao,paizhaoleibie_id,dianhua)
+            return {'chenggong':True}
+        else:
+            return {'chenggong':False,'cuowu':u'没有找到对应id'}
+
+    def updatecarinfo_tell(self,paizhaohao,paizhaoleibie_id,dianhua):
+        qs = DX_CarInfo.objects.filter(paizhaohao=paizhaohao,paizhaoleibie_id=paizhaoleibie_id)
+        if dianhua != '':#删除电话后传入值为''
+            self.aes_cipher = AESCipher()
+            qs.update(dianhua=self.aes_cipher.encrypt(dianhua))
+        else:
+            qs.delete()
+
+
 class Dx_TellNumCount(models.Model):
     jczid = models.CharField(max_length=5, verbose_name=u'检测站id')
     tellnum = models.CharField(max_length=15,verbose_name=u'电话号码')
     tellnumcount = models.IntegerField(default=0,verbose_name=u'出现次数')
 
     def guishudi(self,tellnum):
+        """
         #url = "https://way.jd.com/jisuapi/query4?shouji="+tellnum+"&appkey=f2a58b43cdc3bdfd31962fdf87b9dd88"
         url = 'https://way.jd.com/shujujia/mobile?mobile='+tellnum+'&appkey=f2a58b43cdc3bdfd31962fdf87b9dd88'
         try:
@@ -286,7 +337,8 @@ class Dx_TellNumCount(models.Model):
             guishudi = result.get('msg')
             return guishudi
         guishudi = result.get('result').get('province')
-        return guishudi
+        """
+        return u'内蒙古自治区'
 
     def count(self,jczid,tellnum):
         qs = Dx_TellNumCount.objects.filter(jczid=jczid,tellnum=tellnum)
@@ -304,21 +356,41 @@ class Dx_TellNumCount(models.Model):
         guishudi = self.guishudi(tellnum)
         return {'guishudi':guishudi,'cishu':cishu}
 
-
-
-
-
-
-
-
-
-
-
 class SF_log(models.Model):
     json_jieshou = models.CharField(max_length=2048, verbose_name=u'接收内容')
     json_fanhui = models.CharField(max_length=2048, verbose_name=u'返回内容')
     jieshou_time = models.DateTimeField(verbose_name=u'接收时间', null=True)
     fanhui_time = models.DateTimeField(verbose_name=u'返回时间', null=True)
+
+class DXCustomerFileLog(models.Model):#TODO:未完成日志记录功能
+    original_id =  models.CharField(max_length=32,verbose_name=u'原始id')
+    original_content = models.CharField(max_length=2048,verbose_name=u'原始内容')
+    new_content = models.CharField(max_length=2048,verbose_name=u'新内容')
+    upeate_time = models.DateTimeField(verbose_name=u'更新时间')
+    update_host = models.CharField(max_length=32,verbose_name=u'更新机器IP地址')
+
+class Dx_Recommender(models.Model):#推荐人
+    jczid = models.CharField(max_length=2,verbose_name=u'检测站id')
+    name = models.CharField(max_length=30,verbose_name=u'推荐人姓名')
+    tellnumber = models.CharField(max_length=256,verbose_name=u'推荐人电话')
+    creattime = models.DateTimeField(verbose_name=u'创建时间')
+
+    def getrecommenderlist(self,jczid):
+        qs = Dx_Recommender.objects.filter(jczid=jczid).values_list('name')
+        relist = []#返回类似[u'\u4faf\u5229\u9e4f', u'\u59da\u519b']的列表
+        for i in qs:
+            relist.append(i[0])
+        return {'chenggong':True,'data':relist}
+
+    def addrecommender(self,jczid,name,tellnumber):
+        self.aes_cipher = AESCipher()
+        qs = Dx_Recommender.objects.filter(jczid=jczid,name=name)
+        if qs.exists():
+            return {'chenggong':False,'cuowu':u'该人员已存在'}
+        q = Dx_Recommender(jczid=jczid,name=name,tellnumber=self.aes_cipher.encrypt(tellnumber),
+                           creattime=datetime.datetime.now())
+        q.save()
+        return {'chenggong':True}
 
 
 
