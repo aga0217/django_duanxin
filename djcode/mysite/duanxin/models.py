@@ -246,7 +246,7 @@ class DX_CustomerFile(models.Model):
         return qs[0].tellnumber
     def tjrcount(self,jczid,tuijianren):
         today = datetime.date.today()
-        qs = DX_CustomerFile.objects.filter(jczid=jczid,tuijianren=tuijianren,banliriqi__month=today.month)
+        qs = DX_CustomerFile.objects.filter(jczid=jczid,tuijianren=tuijianren,isdel=False,banliriqi__year=today.year,banliriqi__month=today.month)
         return len(qs)
     def addcustomerfile(self,jczid,paizhaohao,cheliangleibie_id,cheliangleibie_str,chezhudianhua,
                         anjianshoufei,weiqishoufei,tuijianren,czry_user,czry):
@@ -296,6 +296,8 @@ class DX_CustomerFile(models.Model):
     def updatedangan(self,jczid,id,beizhu,tuijianren,dianhua):
         qs = DX_CustomerFile.objects.filter(jczid=jczid,id=id)
         if qs.exists():
+            DXCustomerFileLog().addlog(id,qs[0].tuijianren,qs[0].beizhu,qs[0].chezhudianhua,
+                                       tuijianren,beizhu,dianhua)
             qs.update(beizhu=beizhu, tuijianren=tuijianren,chezhudianhua=dianhua)
             paizhaohao = qs[0].paizhaohao
             paizhaoleibie_id = qs[0].cheliangleibie_id
@@ -363,11 +365,52 @@ class SF_log(models.Model):
     fanhui_time = models.DateTimeField(verbose_name=u'返回时间', null=True)
 
 class DXCustomerFileLog(models.Model):#TODO:未完成日志记录功能
-    original_id =  models.CharField(max_length=32,verbose_name=u'原始id')
+    original_id =  models.IntegerField(verbose_name=u'原始id')
     original_content = models.CharField(max_length=2048,verbose_name=u'原始内容')
     new_content = models.CharField(max_length=2048,verbose_name=u'新内容')
     upeate_time = models.DateTimeField(verbose_name=u'更新时间')
-    update_host = models.CharField(max_length=32,verbose_name=u'更新机器IP地址')
+    update_host = models.CharField(max_length=32,verbose_name=u'更新机器IP地址',null=True)
+
+    def addlog(self,id,otjr,obeizhu,odianhua,ntjr,nbeizhu,ndianhua):
+        oconlist = []#原始内容列表
+        nconlist = []#新内容列表
+        otjr1 = u'推荐人：'+otjr
+        if obeizhu == None:
+            obeizhu1 = u'备注：空'
+        else:
+            obeizhu1 = u'备注：'+obeizhu
+        if odianhua == None:
+            odianhua1 = u'电话：空'
+        else:
+            odianhua1 = u'电话：'+odianhua
+        oconlist.append(otjr1)
+        oconlist.append(obeizhu1)
+        oconlist.append(odianhua1)
+        oconstr = ';'.join(oconlist)
+        if ntjr == None:
+            ntjr1 = u'推荐人：空'
+        else:
+            ntjr1 = u'推荐人'+ntjr
+        if nbeizhu == None:
+            nbeizhu1 = u'备注：空'
+        else:
+            nbeizhu1 = u'备注：'+nbeizhu
+        if ndianhua == None:
+            ndianhua1 = u'电话：空'
+        else:
+            ndianhua1 = u'电话：'+ndianhua
+        nconlist.append(ntjr1)
+        nconlist.append(nbeizhu1)
+        nconlist.append(ndianhua1)
+        nconstr = ';'.join(nconlist)
+        q = DXCustomerFileLog(original_id=id,original_content=oconstr,new_content=nconstr,
+                              upeate_time=datetime.datetime.now())
+        q.save()
+
+
+
+
+
 
 class Dx_Recommender(models.Model):#推荐人
     jczid = models.CharField(max_length=2,verbose_name=u'检测站id')
