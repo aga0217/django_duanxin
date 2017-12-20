@@ -420,7 +420,7 @@ def webservice_yewubaijie(requset):#业务办结存入数据库
                 q = DX_FaSongMX(paizhaohao=paizhaohao, tijiao_datetime=datetime.datetime.now(), dianhuahao=car_info_chaxun[0].dianhua,
                             yincheyuan_name=u'空', yincheyuan_dianhua=u'空', fasongjiekou='yewu_banjie',is_delete=False)
                 q.save()
-                # TODO:可以在这个地方修改发送短信
+                sendsms.delay(q.id)
                 qs = DX_Xingshizheng.objects.filter(is_del=False,paizhaohao=paizhaohao,cheliangleibie_id=paizhaoleibie_id).order_by('-chuanjianriqi')[0].id
 
                 qs_update = DX_Xingshizheng.objects.filter(id=qs)
@@ -691,6 +691,7 @@ def jieguo_to_excel(jieguo_df,chaxun_or_duibi):
         writer.save()
     return path_return
 
+#TODO:收费查询功能需要移至shoufei monels中实现
 def webservice_weiqishofuei_chaxun(requset):
     if requset.method == 'POST':
         try:
