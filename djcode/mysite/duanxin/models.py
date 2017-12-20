@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
+from __future__ import absolute_import, unicode_literals
 from django.db import models
 import datetime
 #import pgcryptof
 import requests
 import json
-from jiami_jiemi_test import AESCipher
+from .jiami_jiemi_test import AESCipher
+from .tasks import fasong_yibutest,add,sendsms
 
 class DX_FaSongMX(models.Model):#短信发送明细
     #paizhaoyanse_CHOICES = (('','入库'),('OUT','出库'))
@@ -162,7 +164,7 @@ class DX_ShouFei(models.Model):
 
         else:
             return {'chenggong':False,'cuowu':u'没有通过验证或没有退款权限'}
-
+    #删除收费信息同时删除客户档案
     def deleteCustomerFile(self,id):
         qs = DX_ShouFei.objects.get(id=id)
         day = qs.skrq.day
@@ -174,6 +176,7 @@ class DX_ShouFei(models.Model):
                                                    banliriqi__day=day,banliriqi__month=month,
                                                    banliriqi__year=year)
         qs_update.update(isdel = True)
+
 
 
 
@@ -241,6 +244,16 @@ class DX_CustomerFile(models.Model):
                         tjrcount=self.tjrcount(jczid,tuijianren),
                         yincheyuan_name=u'空', yincheyuan_dianhua=u'空', fasongjiekou='tixing_tjr', is_delete=False)
         q.save()
+        #异步运行，如果使用delay方法会同步执行
+        sendsms.delay(q.id)
+
+
+
+
+
+
+
+
     def gettell(self,jczid,tuijianren):
         qs = Dx_Recommender.objects.filter(jczid=jczid,name=tuijianren)
         return qs[0].tellnumber
@@ -256,6 +269,7 @@ class DX_CustomerFile(models.Model):
                             tuijianren=tuijianren,banliriqi=datetime.datetime.now(),czry_user=czry_user,czry=czry)
         q.save()
         self.savesms(paizhaohao,jczid,tuijianren)
+
     def jiaochaSearch(self,qsList):
         for i in qsList:
             carinfo = self.carinfoSearch(i['paizhaohao'],i['cheliangleibie_id'])
@@ -283,7 +297,12 @@ class DX_CustomerFile(models.Model):
             dic['dianhua'] = None
         qs = DX_CustomerFile.objects.filter(paizhaohao=paizhaohao,cheliangleibie_id=cheliangleibie_id).order_by('-banliriqi')
         if qs:
-            dic['tjr'] = qs[0].tuijianren
+            tuijianren = qs[0].tuijianren
+            verifyname = Dx_Recommender().verifyrecommendername(tuijianren)
+            if verifyname:
+                dic['tjr'] = tuijianren
+            else:
+                dic['tjr'] = None#当查询出的推荐人不存在于推荐人列表中时返回空
         else:
             dic['tjr'] = None
         return dic
@@ -364,12 +383,13 @@ class SF_log(models.Model):
     jieshou_time = models.DateTimeField(verbose_name=u'接收时间', null=True)
     fanhui_time = models.DateTimeField(verbose_name=u'返回时间', null=True)
 
-class DXCustomerFileLog(models.Model):#TODO:未完成日志记录功能
+class DXCustomerFileLog(models.Model):
     original_id =  models.IntegerField(verbose_name=u'原始id')
     original_content = models.CharField(max_length=2048,verbose_name=u'原始内容')
     new_content = models.CharField(max_length=2048,verbose_name=u'新内容')
     upeate_time = models.DateTimeField(verbose_name=u'更新时间')
     update_host = models.CharField(max_length=32,verbose_name=u'更新机器IP地址',null=True)
+
 
     def addlog(self,id,otjr,obeizhu,odianhua,ntjr,nbeizhu,ndianhua):
         oconlist = []#原始内容列表
@@ -407,11 +427,6 @@ class DXCustomerFileLog(models.Model):#TODO:未完成日志记录功能
                               upeate_time=datetime.datetime.now())
         q.save()
 
-
-
-
-
-
 class Dx_Recommender(models.Model):#推荐人
     jczid = models.CharField(max_length=2,verbose_name=u'检测站id')
     name = models.CharField(max_length=30,verbose_name=u'推荐人姓名')
@@ -434,6 +449,172 @@ class Dx_Recommender(models.Model):#推荐人
                            creattime=datetime.datetime.now())
         q.save()
         return {'chenggong':True}
+
+    def verifyrecommendername(self,tuijianren):
+        qs = Dx_Recommender.objects.filter(name=tuijianren)
+        if qs.exists():
+            return True
+        else:
+            return False
+
+class DX_CeleryLog(models.Model):
+    comname = models.CharField(max_length=128,verbose_name=u'执行命令名称')
+    starttime = models.DateTimeField(verbose_name=u'开始执行时间')
+    endtime = models.DateTimeField(verbose_name=u'结束执行时间',null=True)
+    result = models.CharField(max_length=1024, verbose_name=u'执行结果', null=True)
+
+class SendSMS(object):
+    help = u'使用异步方式发送短信以取代定时发送机制'
+    aes_cipher = AESCipher()
+    def __init__(self,id):
+        self.id = id
+    def starttime(self):
+        q = DX_CeleryLog(comname='class_sendsms',starttime=datetime.datetime.now())
+        q.save()
+        q_id = q.id
+        return q_id
+    def filter(self):
+        self.qs = DX_FaSongMX.objects.filter(id=self.id)
+        if len(self.qs) != 1:
+            return False
+        else:
+            return self.qs
+    def send(self):
+        fasong_ID = []
+        starttime_id = self.starttime()
+        qs = self.filter()
+        if qs:
+            for i in qs:
+                if i.fasongjiekou == 'yewu_kaishi':
+                    resp = requests.post(("http://api.weimi.cc/2/sms/send.html"),
+                        data={
+                            "uid": "ipScrzAANE33",
+                            "pas": "jc5fv2nc",
+                            "mob": self.aes_cipher.decrypt(i.dianhuahao),
+                            "cid": "nEFFQCJiIImA",
+                            "type": "json",
+                            "p1": i.paizhaohao
+                            },timeout=3 , verify=False)
+                    result =  json.loads( resp.content )
+                    fasongneirong = u'【鑫运检测】尊敬的%s车主您好，欢迎来到我站办理检测业务' % i.paizhaohao
+                    fasong_ID.append({'id':i.id,'code':result.get('code'),'fanhuixinxi':result.get('msg'),
+                                  'fasongneirong':fasongneirong,'gongyingshang':u'微米'})
+                elif i.fasongjiekou == 'yewu_banjie':
+                    resp = requests.post(("http://api.weimi.cc/2/sms/send.html"),
+                        data={
+                            "uid": "ipScrzAANE33",
+                            "pas": "jc5fv2nc",
+                            "mob": self.aes_cipher.decrypt(i.dianhuahao),
+                            "cid": "AW1EpStGp2cnull",
+                            "type": "json",
+                            "p1": i.paizhaohao
+                            },timeout=3 , verify=False)
+                    result =  json.loads( resp.content )
+                    fasongneirong = u'【鑫运检测】尊敬的%s车主您好，您的检测业务已办结' % i.paizhaohao
+                    fasong_ID.append({'id':i.id,'code':result.get('code'),'fanhuixinxi':result.get('msg'),
+                                  'fasongneirong':fasongneirong,'gongyingshang':u'微米'})
+                elif i.fasongjiekou == 'tixing_tjr':
+                    resp = requests.post(("http://api.weimi.cc/2/sms/send.html"),
+                                         data={
+                                             "uid": "ipScrzAANE33",
+                                             "pas": "jc5fv2nc",
+                                             "mob": self.aes_cipher.decrypt(i.dianhuahao),
+                                             "cid": "lcoDIQJHGdzQ",
+                                             "type": "json",
+                                             "p1": i.paizhaohao,
+                                             "p2":str(i.tjrcount)
+                                         }, timeout=3, verify=False)
+                    result = json.loads(resp.content)
+                    fasongneirong = u'【鑫运检测】%s已经登记，本月您已推荐%s台车辆。请核实。' % (i.paizhaohao,str(i.tjrcount))
+                    fasong_ID.append({'id': i.id, 'code': result.get('code'), 'fanhuixinxi': result.get('msg'),
+                                      'fasongneirong': fasongneirong, 'gongyingshang': u'微米'})
+
+            for a in fasong_ID:
+                q = DX_FaSongMX.objects.filter(id=a.get('id'))
+                q.update(is_fasong=True, fasong_datetime=datetime.datetime.now(), fanhuizhi=a.get('code'),
+                         tijiao_neirong=a.get('fasongneirong'), fanhuixinxi=a.get('fanhuixinxi'),
+                         gongyingshang=a.get('gongyingshang'))
+            a = DX_CeleryLog.objects.filter(id=starttime_id)
+            a.update(result='success',endtime=datetime.datetime.now())
+        else:
+            a = DX_CeleryLog.objcets.filter(id=starttime_id)
+            a.update(result='failure',endtime=datetime.datetime.now())
+
+
+
+
+"""        
+    def handle(self, *args, **options):
+        q = DX_CeleryLog(comname='fasong_yibutest',starttime=datetime.datetime.now())
+        q.save()
+        q_id = q.id
+        qs = DX_FaSongMX.objects.filter(is_delete=False).filter(is_fasong=False,fasongjiekou__in = ['yewu_kaishi','yewu_banjie','tixing_tjr'])
+        fasong_ID = []
+        #fasong_neirong = u'【鑫运检测】尊敬的%s车主您好，欢迎来到我站，本次业务由%s电话%s为您服务，监督、投诉请拨打6491572。' % (i.paizhaohao,i.yincheyuan_name,i.yincheyuan_dianhua)
+
+        if len(qs) == 0:
+            qs = DX_CeleryLog.objects.filter(id=q_id)
+            qs.update(endtime=datetime.datetime.now())
+            exit()
+        else:
+            for i in qs:
+                if i.fasongjiekou == 'yewu_kaishi':
+                    resp = requests.post(("http://api.weimi.cc/2/sms/send.html"),
+                        data={
+                            "uid": "ipScrzAANE33",
+                            "pas": "jc5fv2nc",
+                            "mob": self.aes_cipher.decrypt(i.dianhuahao),
+                            "cid": "nEFFQCJiIImA",
+                            "type": "json",
+                            "p1": i.paizhaohao
+                            },timeout=3 , verify=False)
+                    result =  json.loads( resp.content )
+                    fasongneirong = u'【鑫运检测】尊敬的%s车主您好，欢迎来到我站办理检测业务' % i.paizhaohao
+                    fasong_ID.append({'id':i.id,'code':result.get('code'),'fanhuixinxi':result.get('msg'),
+                                  'fasongneirong':fasongneirong,'gongyingshang':u'微米'})
+                elif i.fasongjiekou == 'yewu_banjie':
+                    resp = requests.post(("http://api.weimi.cc/2/sms/send.html"),
+                        data={
+                            "uid": "ipScrzAANE33",
+                            "pas": "jc5fv2nc",
+                            "mob": self.aes_cipher.decrypt(i.dianhuahao),
+                            "cid": "AW1EpStGp2cnull",
+                            "type": "json",
+                            "p1": i.paizhaohao
+                            },timeout=3 , verify=False)
+                    result =  json.loads( resp.content )
+                    fasongneirong = u'【鑫运检测】尊敬的%s车主您好，您的检测业务已办结' % i.paizhaohao
+                    fasong_ID.append({'id':i.id,'code':result.get('code'),'fanhuixinxi':result.get('msg'),
+                                  'fasongneirong':fasongneirong,'gongyingshang':u'微米'})
+                elif i.fasongjiekou == 'tixing_tjr':
+                    resp = requests.post(("http://api.weimi.cc/2/sms/send.html"),
+                                         data={
+                                             "uid": "ipScrzAANE33",
+                                             "pas": "jc5fv2nc",
+                                             "mob": self.aes_cipher.decrypt(i.dianhuahao),
+                                             "cid": "lcoDIQJHGdzQ",
+                                             "type": "json",
+                                             "p1": i.paizhaohao,
+                                             "p2":str(i.tjrcount)
+                                         }, timeout=3, verify=False)
+                    result = json.loads(resp.content)
+                    fasongneirong = u'【鑫运检测】%s已经登记，本月您已推荐%s台车辆。请核实。' % (i.paizhaohao,str(i.tjrcount))
+                    fasong_ID.append({'id': i.id, 'code': result.get('code'), 'fanhuixinxi': result.get('msg'),
+                                      'fasongneirong': fasongneirong, 'gongyingshang': u'微米'})
+
+
+
+
+        for a in fasong_ID:
+            q = DX_FaSongMX.objects.filter(id=a.get('id'))
+            q.update(is_fasong=True,fasong_datetime=datetime.datetime.now(),fanhuizhi=a.get('code'),
+                     tijiao_neirong=a.get('fasongneirong'),fanhuixinxi=a.get('fanhuixinxi'),
+                     gongyingshang=a.get('gongyingshang'))
+        qs = DX_CeleryLog.objects.filter(id = q_id)
+        qs.update(endtime=datetime.datetime.now())
+    
+"""
+
 
 
 
