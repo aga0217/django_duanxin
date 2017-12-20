@@ -2,7 +2,6 @@
 from django.shortcuts import render_to_response, get_object_or_404, get_list_or_404
 from calendar import HTMLCalendar,monthrange
 #from django.utils.translation import ugettext_lazy as _
-from dateutil.relativedelta import relativedelta
 from forms import *
 from models import *
 from django.views.generic import ListView
@@ -53,7 +52,8 @@ import pyodbc
 import requests
 from xpinyin import Pinyin
 from jiami_jiemi_test import AESCipher
-ip_yunxu = ['192.168.0.179','192.168.0.1','15.29.32.56','15.29.32.55','15.29.32.49']
+from tasks import sendsms
+ip_yunxu = ['192.168.0.1','15.29.32.56','15.29.32.55','15.29.32.49','192.168.0.2']
 def tijiao(request):
 	#global jiaxiaoidglobal
 	#jiaxiaoid = int(jiaxiaoid)
@@ -420,7 +420,7 @@ def webservice_yewubaijie(requset):#业务办结存入数据库
                 q = DX_FaSongMX(paizhaohao=paizhaohao, tijiao_datetime=datetime.datetime.now(), dianhuahao=car_info_chaxun[0].dianhua,
                             yincheyuan_name=u'空', yincheyuan_dianhua=u'空', fasongjiekou='yewu_banjie',is_delete=False)
                 q.save()
-
+                # TODO:可以在这个地方修改发送短信
                 qs = DX_Xingshizheng.objects.filter(is_del=False,paizhaohao=paizhaohao,cheliangleibie_id=paizhaoleibie_id).order_by('-chuanjianriqi')[0].id
 
                 qs_update = DX_Xingshizheng.objects.filter(id=qs)
@@ -428,6 +428,7 @@ def webservice_yewubaijie(requset):#业务办结存入数据库
                 qs_update.update(fasong_time=datetime.datetime.now(),is_fasong=True)
                 qs_update_carinfo = DX_CarInfo.objects.filter(id = car_info_chaxun[0].id)
                 qs_update_carinfo.update(next_riqi=NetxTime,editriqi=datetime.datetime.now())
+
             #result = {'zhuangtai':'Success','zhuangtai_str':u'成功'}
             return HttpResponse(panduan.get('zhuangtai_str'))
         else:
@@ -441,6 +442,7 @@ def webservice_yewubaijie(requset):#业务办结存入数据库
 
 
 def shijianchuli(paizhaohao,paizhaoleibie_id):
+    #TODO:收费记录查询sqlserver，需要修改为查询shoufei models
     now = datetime.datetime.now()
     #paizhaohao = u'蒙A18398'
     #paizhaoleibie_id = '13'
@@ -820,6 +822,8 @@ def webservice_shoufei(requset):#收费webserices
             fkfs_id = '04'
         elif fkfs == u'银行卡':
             fkfs_id = '05'
+        elif fkfs == u'哪儿检':
+            fkfs_id = '06'
         tuijianren = jieshou_json.get('tuijianren')
         data = jieshou_json.get('data')
         if data is None:
@@ -1444,7 +1448,7 @@ def ShouFeiChuLi_1(jczid,cph,pzlb_int,pzlb_str,chezhudh,czry,czry_user,fkfs_id,f
                 is_kefu = False
             jylb = data.get(i).get('jylb')
             jfje = data.get(i).get('jfje')
-            anjian_fanhui =anjianshujucharu_1(cph,pzlb_int,pzlb_str,chezhudh,czry,jylb,jfje,is_kefu=False)
+            anjian_fanhui =anjianshujucharu_1(cph,pzlb_int,pzlb_str,czry,jylb,jfje,is_kefu=False)
 
             q = DX_ShouFei(jczid=jczid,paizhaohao=cph,cheliangleibie_id=pzlb_int,
                            cheliangleibie_str=pzlb_str,chezhudianhua=chezhudh,
@@ -1454,7 +1458,41 @@ def ShouFeiChuLi_1(jczid,cph,pzlb_int,pzlb_str,chezhudh,czry,czry_user,fkfs_id,f
                            is_kefu=is_kefu,is_tuikuan=is_tuikuan,bjr=bjr,bjr_username=bjr_username,tuikuan_riqi=tuikuan_riqi,
                            tuikuan_shuoming=tuikuanyuanyin)
 
-            q.save()#TODO:处理返回值
+            q.save()
+            if istellnumber(chezhudh):
+                #先将车辆信息存入到carinfo,然后发送信息，存入carinfo时需要判断是否已存在，tongbushoufei.py 34行
+                aes_cipher = AESCipher()
+                dianhua = aes_cipher.encrypt(chezhudh)
+                today = datetime.date.today()
+                year, month, day = today.year, today.month, today.day
+                if DX_CarInfo.objects.filter(paizhaohao=cph, paizhaoleibie_id=pzlb_int).exists():  # 如果车号和类别在车辆信息表存在
+                    qs = DX_CarInfo.objects.filter(paizhaohao=cph, paizhaoleibie_id=pzlb_int)
+                    if qs[0].iswanzheng == True and issameday(qs[0].editriqi) != True:
+                        # qs.update(jiancecishu=qs[0].jiancecishu+1,editriqi=datetime.datetime.now(),dianhua=dianhua,
+                        # next_riqi=self.next_riqi_def(qs[0].dengjiriqi,qs[0].paizhaoleibie_id,qs[0].yingyunleibie_id))
+                        # 似乎不需要更新下次检测时间，下次检测时间由xingshizheng_app读取公安系统得来
+                        qs.update(jiancecishu=qs[0].jiancecishu + 1, editriqi=datetime.datetime.now(), dianhua=dianhua)
+                    else:
+                        qs.update(editriqi=datetime.datetime.now(), dianhua=dianhua)
+                else:
+                    p = DX_CarInfo(dianhua=dianhua, paizhaohao=cph, chepai_hou=chepaihaofenkai(cph).get('chepai_hou'),
+                                   chepai_qian=chepaihaofenkai(cph).get('chepai_qian'),
+                                   paizhaoleibie_id=pzlb_int, paizhaoleibie_str=pzlb_str, tongbulaiyuan='nianjian')
+                    p.save()
+                if not DX_FaSongMX.objects.filter(paizhaohao=cph).filter(tijiao_datetime__year=year,
+                                                                               tijiao_datetime__month=month,
+                                                                               tijiao_datetime__day=day,
+                                                                         fasongjiekou='yewu_kaishi').exists():  # 如果车号和类别在发送明细中不存在
+                    q = DX_FaSongMX(paizhaohao=cph, tijiao_datetime=datetime.datetime.now(), dianhuahao=dianhua,
+                                    yincheyuan_name=u'空', yincheyuan_dianhua=u'空', fasongjiekou='yewu_kaishi')
+                    q.save()
+
+                    sendsms.delay(q.id)
+
+
+
+
+
         if i == 'weiqi':#处理尾气
             jylb = data.get(i).get('jylb')
             jfje = data.get(i).get('jfje')
@@ -1516,7 +1554,29 @@ def ShouFeiChuLi_1(jczid,cph,pzlb_int,pzlb_str,chezhudh,czry,czry_user,fkfs_id,f
     #return {'qs':qs,'groupsum':QsGroupSum}
     return {'chenggong':True}
 
-def anjianshujucharu_1(cph,pzlb_int,pzlb_str,chezhudh,czry,jylb,jfje,is_kefu):
+def istellnumber(dianhua):#简单判断是不是一个有效电话号码
+    re_dianhua = ur"[0-9]"
+    if re.match(re_dianhua,dianhua) and dianhua[0] == '1' and len(dianhua) == 11:
+        return True
+    else:
+        return False
+
+def issameday(datetime_1):
+    year,month,day = datetime_1.year,datetime_1.month,datetime_1.day
+    datetime_2 = datetime.date(year,month,day)
+    today = datetime.date.today()
+    if datetime_2 == today:
+        return True
+    else:
+        return False
+
+def chepaihaofenkai(chepaihao):
+    chepai_qian = chepaihao[0]
+    chepai_hou = chepaihao[1]
+    return {'chepai_qian':chepai_qian,'chepai_hou':chepai_hou}
+
+
+def anjianshujucharu_1(cph,pzlb_int,pzlb_str,czry,jylb,jfje,is_kefu):#存入sqlserver的安检缴费数据不再保存，结果保存到shoufei models
     DBCONNECTSTR = 'DRIVER={SQL Server};SERVER=15.29.32.3;port=1433;DATABASE=NewGaJck_TB;UID=sa;PWD=svrcomputer;TDS_Version=7.1;'
     conn = pyodbc.connect(DBCONNECTSTR)
     cursor = conn.cursor()
@@ -1524,17 +1584,17 @@ def anjianshujucharu_1(cph,pzlb_int,pzlb_str,chezhudh,czry,jylb,jfje,is_kefu):
     zuidashu = cursor.fetchall()[0][0]
     sql = ''
     parameters = ()
-    if chezhudh != '' and is_kefu != False:
+    if is_kefu == True:
         sql = "insert into  UFee (FPHM,CPH,PZLBID,PZLB,JCSX,JCLB,JKDW,SKXM,SKR,SKRQ,SKJE,BZ) values (?,?,?,?,?,?,?,?,?,?,?,?)"
-        parameters = (zuidashu+1, cph, pzlb_int, pzlb_str, 0, jylb, chezhudh, u'安检费', czry,datetime.datetime.now(), jfje,u'客服')
-    elif chezhudh != '' and is_kefu == False:
-        sql = "insert into  UFee (FPHM,CPH,PZLBID,PZLB,JCSX,JCLB,JKDW,SKXM,SKR,SKRQ,SKJE,BZ) values (?,?,?,?,?,?,?,?,?,?,?,?)"
-        parameters = (zuidashu+1, cph, pzlb_int, pzlb_str, 0, jylb, chezhudh, u'安检费', czry,datetime.datetime.now(), jfje,'')
-    elif chezhudh == '' and is_kefu != False:
-        sql = "insert into  UFee (FPHM,CPH,PZLBID,PZLB,JKDW,JCSX,JCLB,SKXM,SKR,SKRQ,SKJE,BZ) values (?,?,?,?,?,?,?,?,?,?,?,?)"
-        parameters = (zuidashu+1, cph, pzlb_int, pzlb_str, '',0, jylb, u'安检费', czry,datetime.datetime.now(), jfje,u'客服')
+        parameters = (zuidashu+1, cph, pzlb_int, pzlb_str, 0, jylb, '',u'安检费', czry,datetime.datetime.now(), jfje,u'客服')
+    #elif chezhudh != '' and is_kefu == False:
+        #sql = "insert into  UFee (FPHM,CPH,PZLBID,PZLB,JCSX,JCLB,JKDW,SKXM,SKR,SKRQ,SKJE,BZ) values (?,?,?,?,?,?,?,?,?,?,?,?)"
+        #parameters = (zuidashu+1, cph, pzlb_int, pzlb_str, 0, jylb, chezhudh, u'安检费', czry,datetime.datetime.now(), jfje,'')
+    #elif chezhudh == '' and is_kefu != False:
+        #sql = "insert into  UFee (FPHM,CPH,PZLBID,PZLB,JKDW,JCSX,JCLB,SKXM,SKR,SKRQ,SKJE,BZ) values (?,?,?,?,?,?,?,?,?,?,?,?)"
+        #parameters = (zuidashu+1, cph, pzlb_int, pzlb_str, '',0, jylb, u'安检费', czry,datetime.datetime.now(), jfje,u'客服')
 
-    elif chezhudh == '' and is_kefu == False:
+    elif is_kefu == False:
         sql = "insert into  UFee (FPHM,CPH,PZLBID,PZLB,JKDW,JCSX,JCLB,SKXM,SKR,SKRQ,SKJE,BZ) values (?,?,?,?,?,?,?,?,?,?,?,?)"
         parameters = (zuidashu+1, cph, pzlb_int, pzlb_str, '',0, jylb, u'安检费', czry,datetime.datetime.now(), jfje,'')
     cursor.execute(sql, parameters)
