@@ -7,6 +7,7 @@ import requests
 import json
 from .jiami_jiemi_test import AESCipher
 from .tasks import fasong_yibutest,add,sendsms
+from django.db.models import Max
 
 class DX_FaSongMX(models.Model):#短信发送明细
     #paizhaoyanse_CHOICES = (('','入库'),('OUT','出库'))
@@ -105,7 +106,7 @@ class DX_ShouFei(models.Model):
     jyxm =  models.CharField(max_length=30, verbose_name=u'检验项目')#对应安检、尾气、综检、其他项目
     jylb = models.CharField(max_length=30, verbose_name=u'检验类别')#对# 应在用车检验、不透光中型、等级评定、服务费
     jylb_pinyin = models.CharField(max_length=256,verbose_name=u'检验类别拼音',null=True)
-    dyid = models.IntegerField(verbose_name=u'对应数据库ID，sql数据库返回值')
+    dyid = models.IntegerField(verbose_name=u'对应数据库ID，sql数据库返回值',null=True)
     skr = models.CharField(max_length=30, verbose_name=u'收款人姓名')
     skr_username = models.CharField(max_length=30,verbose_name=u'收款人用户名')
     skrq = models.DateTimeField(verbose_name=u'收款日期')
@@ -124,12 +125,14 @@ class DX_ShouFei(models.Model):
     is_tuikuan = models.BooleanField(verbose_name=u'是否退款',default=False)
     tuikuan_riqi = models.DateTimeField(verbose_name=u'退款日期',null=True)
     tuikuan_shuoming = models.CharField(max_length=256,verbose_name=u'退款说明',null=True)
+    is_weiqitongbu = models.BooleanField(default=False,verbose_name=u'是否被尾气同步程序读取过')
+    zongjian_cheliangleixing = models.CharField(max_length=256,verbose_name=u'综检车辆类型',null=True)#综检对应车辆类型客车、货车、出租车
 
     def tuikuan(self,user,pws,id):
         yanzheng = DX_ShouFei_UserName().UserDengLu(user,pws)
         if yanzheng.get('denglu') ==True and yanzheng.get('is_tuikuan') == True:
             qs = DX_ShouFei.objects.filter(id=id)
-            print qs[0].id
+            #print qs[0].id
 
             if not qs:#qs为空
                 return {'chenggong': False, 'cuowu': u'没有找到指定ID'}
@@ -149,10 +152,11 @@ class DX_ShouFei(models.Model):
             is_tuikuan = True
             jylb = qs[0].jylb
             jfje = -qs[0].skje
+            zongjian_cheliangleixing = qs[0].zongjian_cheliangleixing
             chezhudh = ''
             bjr_username = yanzheng.get('username')
             bjr = yanzheng.get('user_str')
-            data = {qs[0].jyxm:{'jylb':jylb,'jfje':jfje}}
+            data = {qs[0].jyxm:{'jylb':jylb,'jfje':jfje,'zongjian_cheliangleixing':zongjian_cheliangleixing}}
             return {'chenggong':True,'data':{'jczid':jczid,'cph':cph,'pzlb_int':pzlb_int,
                                                  'pzlb_str':pzlb_str,'chezhudh':chezhudh,
                                                  'czry':czry,'czry_user':czry_user,'fkfs_id':fkfs_id,
@@ -176,10 +180,47 @@ class DX_ShouFei(models.Model):
                                                    banliriqi__day=day,banliriqi__month=month,
                                                    banliriqi__year=year)
         qs_update.update(isdel = True)
+    def searchshoufei(self,cph,cheliangleibie_id):
+        today = datetime.date.today()
+        startday = today-datetime.timedelta(days=60)
+        endday = today+datetime.timedelta(days=1)
+        qs = DX_ShouFei.objects.filter(skrq__gte=startday,skrq__lte=endday).filter(paizhaohao=cph,cheliangleibie_id=cheliangleibie_id).order_by('-skrq')
+        qs_anjian = qs.filter(jyxm='anjian')
+        if len(qs_anjian) ==0:
+            anjian_jine = 0
+        else:
+            anjian_jine = qs_anjian[0].skje
+        qs_weiqi = qs.filter(jyxm='weiqi')
+        if len(qs_weiqi) == 0:
+            weiqi_jine = 0
+        else:
+            weiqi_jine = qs_weiqi[0].skje
+        if anjian_jine >0 and weiqi_jine >0:
+            return {'chenggong':True}
+        if anjian_jine == 0 or anjian_jine <0:
+            return {'chenggong':False,'neirong':u'没有找到车辆安检收费记录，是否继续？'}
+        if weiqi_jine == 0 and weiqi_jine <0:
+            return {'chenggong':False,'neirong':u'没有找到车辆尾气收费记录，是否继续？'}
 
-
-
-
+    def getweiqitongbushoufei(self,startday,endday):
+        qs = DX_ShouFei.objects.filter(skrq__gte=startday, skrq__lte=endday).filter(jyxm='weiqi',is_weiqitongbu=False) \
+            .order_by('-skrq')
+        if not qs:#if not qs表示在qs没有查询结果的情况
+            return None
+        else:
+            return qs.values_list('paizhaohao', 'cheliangleibie_id', 'skje', 'is_tuikuan','skrq','cheliangleibie_str')
+        #qs = DX_ShouFei.objects.filter(skrq__gte=startday, skrq__lte=endday).filter(jyxm='weiqi',is_weiqitongbu=False).values_list('paizhaohao', 'cheliangleibie_id', 'skje', 'is_tuikuan')
+    def decrefund(self,startday,endday,cph,chepai_leibie):#判断是否退款
+        qs = DX_ShouFei.objects.filter(skrq__gte=startday, skrq__lte=endday).filter(paizhaohao=cph,
+                    cheliangleibie_id=chepai_leibie).filter(jyxm='weiqi', is_weiqitongbu=False).values_list('skje')
+        sumlist = []
+        for i in qs:
+            sumlist.append(i[0])
+        sumskje = sum(sumlist)
+        if sumskje > 0:#近一个月的收款金额总和大于0
+            return False #退款状态为未退款
+        else:
+            return True #退款状态为已退款
 
 
 class DX_ShouFei_UserName(models.Model):
@@ -462,6 +503,16 @@ class DX_CeleryLog(models.Model):
     starttime = models.DateTimeField(verbose_name=u'开始执行时间')
     endtime = models.DateTimeField(verbose_name=u'结束执行时间',null=True)
     result = models.CharField(max_length=1024, verbose_name=u'执行结果', null=True)
+#TODO:增加记录付款方式的表
+class DX_ShouFei_Config_FuKuanFangShi(models.Model):
+    fukuanfangshi = models.CharField(max_length=100,verbose_name=u'付款方式列表')
+    isuse = models.BooleanField(default=True)
+    def getfukuanfangshi(self):
+        fukuanfangshi = []
+        qs = DX_ShouFei_Config_FuKuanFangShi.objects.filter(isuse = True).order_by('id').values_list('fukuanfangshi')
+        for i in qs:
+            fukuanfangshi.append(i[0])
+        return fukuanfangshi
 
 class SendSMS(object):
     help = u'使用异步方式发送短信以取代定时发送机制'
