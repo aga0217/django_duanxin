@@ -3,26 +3,34 @@ import sys
 import os
 from PySide.QtGui import *
 from PySide.QtCore import *
+from PySide import QtCore
 from PySide.QtWebKit import *
 from denglu_ui import Ui_denglu_Dialog
 from shoufei_ui import Ui_MainWindow
 from xiugaimima_ui import Ui_xiugaimima_Dialog
 from shoufeidan_ui import Ui_Ui_shoufeidanyulan_Dialog
 from jiezhang_chuangkou import Ui_Ui_jiezhang_Dialog
+from tuikuanyuanyin_ui import Ui_Ui_tuikuan_Dialog
+from tuijianren_ui import Ui_TuiJianRen_UI_Dialog
 import datetime
 import re
 import json
 import requests
-import time
 from xhtml2pdf import pisa
-#import testprint
-
+import testprint
+requests.packages.urllib3.disable_warnings()#关闭证书的安全提示
 dizhi = ''
 skr_username = ''
 skr_username_str = u''
 jcz_id = ''
 user_pass = ''
 CAN_TUIKUAN = ''
+ID_LIST = []
+TJRNAME = ''
+SHOUFEICONFIG = {}
+
+class xinhao_class(QtCore.QObject):
+    speak = QtCore.Signal(str)
 class denglu_chuangkou(QDialog,Ui_denglu_Dialog):
     def __init__(self, parent=None):
         super(denglu_chuangkou, self).__init__(parent)
@@ -48,6 +56,32 @@ class denglu_chuangkou(QDialog,Ui_denglu_Dialog):
             sys.exit(app.exit())
         self.username.editingFinished.connect(lambda :self.FinishUserName())
         self.denglu_Button.clicked.connect(lambda: self.handleLogin())
+    def getconfig(self):#获取配置文件
+        fasong_data = {'skr_username':skr_username , 'password':user_pass}
+        url = dizhi + 'getconfig/'
+        try:#处理连接时候的异常
+            resp = requests.post(url, verify=False, data=json.dumps(fasong_data))
+        except Exception,e:
+            e = repr(e)#避免出现中文字符
+            f = open('error.log','a')#文件追加模式
+            s1 = str(datetime.datetime.now())+e+'\n'
+            f.write(s1)
+            f.close()
+            self.tishikuang.setText(u'getconfig连接出现错误，查看日志文件')
+            self.tishikuang.exec_()
+            sys.exit(app.exit())
+        result_rep = resp.content
+        global SHOUFEICONFIG
+        try:  # 处理接受json的异常
+            SHOUFEICONFIG = json.loads(result_rep)
+            print SHOUFEICONFIG
+        except:
+            f = open('error.log', 'a')
+            f.write(result_rep)
+            f.close()
+            self.tishikuang.setText(u'getconfig返回结果格式不正确')
+            self.tishikuang.exec_()
+            sys.exit(app.exit())
 
     def handleLogin(self):
         password =  self.password.text()
@@ -98,6 +132,8 @@ class denglu_chuangkou(QDialog,Ui_denglu_Dialog):
             CAN_TUIKUAN = result.get('is_tuikuan')
             global user_pass
             user_pass = self.password.text()
+            self.getconfig()
+
             self.accept()  # 关键
 
         #if (self.textName.text() == 'foo' and
@@ -213,6 +249,8 @@ class shoufeidanyulan_chuangkou(QDialog,Ui_Ui_shoufeidanyulan_Dialog):
 
 
         self.webView.load(QUrl.fromLocalFile(os.path.abspath("shoufeidan.html")))
+
+
         #view_html.load(QUrl.fromLocalFile(os.path.abspath("shoufeidan.html")))
         self.webView.show()
 
@@ -221,7 +259,62 @@ class shoufeidanyulan_chuangkou(QDialog,Ui_Ui_shoufeidanyulan_Dialog):
         Window().HtmlToPDF(filename)
         testprint.printPDF(filename)
 
+class tuikuanyuanyin_chuangkou(QDialog,Ui_Ui_tuikuan_Dialog):
+    def __init__(self, parent=None):
+        super(tuikuanyuanyin_chuangkou, self).__init__(parent)
+        self.setupUi(self)
+        self.xinhao = xinhao_class()
+        self.button_tuikuan.clicked.connect(lambda :self.tuikuan())
 
+        #view_html.load(QUrl.fromLocalFile(os.path.abspath("shoufeidan.html")))
+
+
+    def getvlue(self):
+        yuanyinlist = []
+        if self.yuanyin_1.isChecked():
+            yuanyinlist.append('1')
+        if self.yuanyin_2.isChecked():
+            yuanyinlist.append('2')
+        if self.yuanyin_3.isChecked():
+            yuanyinlist.append('3')
+        if self.yuanyin_4.isChecked():
+            yuanyinlist.append('4')
+        if self.yuanyin_5.isChecked():
+            yuanyinlist.append('5')
+        if self.yuanyin_6.isChecked():
+            yuanyinlist.append('6')
+        if len(self.yuanyin_input.text())!=0:
+            yuanyinlist.append(self.yuanyin_input.text())
+        if len(yuanyinlist) == 0:
+            self.tixingkuang = QMessageBox()
+            self.tixingkuang.setText(u'至少选择一种原因')
+            self.tixingkuang.exec_()
+            return None
+        return ','.join(yuanyinlist)
+
+    def tuikuan(self):
+        self.tixingkuang = QMessageBox()
+        tuikuanyuanyin = self.getvlue()
+        if tuikuanyuanyin == None:
+            return
+        data = {'jczid': jcz_id, 'czry': skr_username, 'czry_pass': user_pass,'id_list':ID_LIST,
+                'tuikuanyuanyin':tuikuanyuanyin}
+        lianjie = Window().LianJie('tuikuan/', data)
+        fanhui = lianjie.get('chenggong')
+        if fanhui == True:
+            self.tixingkuang.setText(u'处理成功')
+            self.tixingkuang.exec_()
+            #self.fasongxinhao()
+            self.close()#关闭窗口
+
+        else:
+            self.tixingkuang.setText(u'发生错误')
+            self.tixingkuang.exec_()
+    '''
+    def fasongxinhao(self):
+        self.xinhao.speak.connect(Window().receivslot)
+        self.xinhao.speak.emit('shuaxinliebiao')
+    '''
 
 class jiezhang_chuangkou(QDialog,Ui_Ui_jiezhang_Dialog):
     def __init__(self, parent=None):
@@ -231,6 +324,8 @@ class jiezhang_chuangkou(QDialog,Ui_Ui_jiezhang_Dialog):
         xianshiqiri = today+ datetime.timedelta(-1)
         self.jiezhang_dateEdit.setDate(xianshiqiri)
         self.anjian_radioButton.toggled.connect(lambda :self.Clickradiobutton())
+        self.weiqi_radioButton.toggled.connect(lambda: self.Clickradiobutton())
+        self.zongjian_radioButton.toggled.connect(lambda: self.Clickradiobutton())
         self.Button_dayin.setDisabled(True)
         self.Button_chazhaojiehangdan.setDisabled(True)
         self.Button_chazhaojiehangdan.clicked.connect(lambda :self.chazhaojiezhangdan())
@@ -254,6 +349,18 @@ class jiezhang_chuangkou(QDialog,Ui_Ui_jiezhang_Dialog):
             self.Button_chazhaojiehangdan.setEnabled(True)
             self.Button_dayin.setEnabled(True)
             self.jiesuangxiangmu = 'weiqi'
+            data = {'jczid':jcz_id,'czry':skr_username,'czry_pass':user_pass,'jiesuanxiangmu':self.jiesuangxiangmu}
+            url = dizhi + 'jiezhangyulan/'
+            resp = requests.post(url, verify=False, data=json.dumps(data))
+            result_rep = resp.content
+            with open('shoufeidan.html', 'wb') as f:
+                f.write(result_rep)
+                f.close()
+            self.webView.load(QUrl.fromLocalFile(os.path.abspath("shoufeidan.html")))
+        if self.zongjian_radioButton.isChecked():
+            self.Button_chazhaojiehangdan.setEnabled(True)
+            self.Button_dayin.setEnabled(True)
+            self.jiesuangxiangmu = 'zongjian'
             data = {'jczid':jcz_id,'czry':skr_username,'czry_pass':user_pass,'jiesuanxiangmu':self.jiesuangxiangmu}
             url = dizhi + 'jiezhangyulan/'
             resp = requests.post(url, verify=False, data=json.dumps(data))
@@ -300,17 +407,6 @@ class jiezhang_chuangkou(QDialog,Ui_Ui_jiezhang_Dialog):
         Window().HtmlToPDF(filename)
         testprint.printPDF(filename)
 
-
-
-
-
-
-
-
-
-
-
-
 class Window(QMainWindow,Ui_MainWindow):
     def __init__(self, parent=None):
         super(Window, self).__init__(parent)
@@ -323,26 +419,33 @@ class Window(QMainWindow,Ui_MainWindow):
         self.anjian_jine = 0
         self.weiqi_jine = 0
         self.zongjian_jine = 0
+        self.zongjian_jine_2 = 0
         self.qita_jine1 = 0
         self.qita_jine2 = 0
         self.qita_jine3 = 0
         self.qita_jine4 = 0
+        self.tuijianren.setReadOnly(True)
+        #self.tuijianren.setText('123456')
+        #self.tuijianren.setText('12')
         self.button_shoukuan.setDisabled(True)
         self.button_chexiao.setDisabled(True)
+        #self.tuijianren.setReadOnly(True)
         if not CAN_TUIKUAN:
             self.button_tuikuan.setDisabled(True)
         #self.button_dayin.setDisabled((True))
         #self.button_jiezhang.setDisabled(True)
         #self.button_biaojikaipiao.setDisabled(True)
-        self.fukuangfangshi_list = [u'现金',u'微信支付',u'支付宝支付',u'银行卡',u'预付费卡']
+        #TODO:将fukuangfangshi_list更改为由SHOUFEICONFIG获得(付款方式已成功，需继续修改其他配置)
+        #self.fukuangfangshi_list = [u'现金',u'微信支付',u'支付宝支付',u'银行卡',u'哪儿检',u'预付费卡']
+        self.fukuangfangshi_list = SHOUFEICONFIG['fukuanfangshi']
         self.cheliang_leixing_list = ['--',u'小型汽车',u'大型汽车',u'挂车',u'两、三轮摩托车',u'教练汽车',u'农用运输车',u'警用汽车',
-                                     u'警用摩托车',u'轻便摩托车']
+                                     u'警用摩托车',u'轻便摩托车',u'外籍汽车']
         self.chepai_qian.addItems([u'蒙',u'京',u'津',u'沪',u'渝',u'冀',u'豫',u'云',u'辽',u'黑',u'湘',
                                        u'皖',u'鲁',u'新',u'苏',u'浙',u'赣',u'桂',u'甘',u'晋',u'陕',u'吉',
                                        u'闽',u'贵',u'青',u'藏',u'琼',u'粤',u'川',u'宁',u'鄂'])
-        self.chepai_zimu.addItems(['A','B','C','D','E','F','G','H','J','K','L','M','N','O','P','Q','R','S','T','U','V','W',
-                                   'X','Y','Z','--'])
-        self.chaxun_shoufeixiangmu.addItems(['--',u'安检',u'尾气',u'其他'])
+        self.chepai_zimu.addItems(['--','A','B','C','D','E','F','G','H','J','K','L','M','N','O','P','Q','R','S','T','U','V','W',
+                                   'X','Y','Z'])
+        self.chaxun_shoufeixiangmu.addItems(['--',u'安检',u'尾气',u'综检',u'其他'])
         self.anjianshoufei_xiangmu_dic = {'02':[u'在用机动车检验-90',u'注册登记检验-90',u'过户提档-90',u'事故车辆检验-100',
                                                 u'在用机动车检验-65',u'在用机动车检验-56',u'在用机动车检验-48'],
                                           '01':[u'在用机动车检验-110',u'注册登记检验-110',u'过户提档-110',u'事故车辆检验-100'],
@@ -351,7 +454,7 @@ class Window(QMainWindow,Ui_MainWindow):
                                           '06':[u'在用机动车检验-90',u'注册登记检验-90',u'过户提档-90',u'事故车辆检验-100'],
                                           '13':[u'在用机动车检验-110',u'在用机动车检验-70',u'注册登记检验-110',u'过户提档-110',u'事故车辆检验-100'],
                                           '16':[u'在用机动车检验-110',u'注册登记检验-110',u'过户提档-110',u'事故车辆检验-100'],
-                                          '23':[u'在用机动车检验-90',u'在用机动车检验-110'],
+                                          '23':[u'在用机动车检验-90',u'在用机动车检验-110',u'临时检验-280',u'临时检验-319'],
                                           '24':[u'在用机动车检验-70',u'注册登记检验-70',u'过户提档-70',u'事故车辆检验-100'],
                                           '08':[u'在用机动车检验-70',u'注册登记检验-70',u'过户提档-70',u'事故车辆检验-100']
 
@@ -364,17 +467,20 @@ class Window(QMainWindow,Ui_MainWindow):
                                                '06':{u'在用机动车检验-90':90,u'注册登记检验-90':90,u'过户提档-90':90,u'事故车辆检验-100':100},
                                                '13':{u'在用机动车检验-110':110,u'注册登记检验-110':110,u'过户提档-110':110,u'在用机动车检验-70':70,u'事故车辆检验100':100},
                                                '16':{u'在用机动车检验-110':110,u'注册登记检验-110':110,u'过户提档-110':110,u'事故车辆检验-100':110},
-                                               '23':{u'在用机动车检验-90':90,u'在用机动车检验-110':110},
+                                               '23':{u'在用机动车检验-90':90,u'在用机动车检验-110':110,u'临时检验-280':280,u'临时检验-319':319},
                                                '24':{u'在用机动车检验-70':70,u'注册登记检验-70':70,u'过户提档-70':70,u'事故车辆检验-100':100},
                                                '08': {u'在用机动车检验-70': 70, u'注册登记检验-70': 70, u'过户提档-70': 70,
                                                       u'事故车辆检验-100': 100},
                                                }
         self.weiqishoufei_xiangmu_list = [u'稳态收费-80',u'不透光中型-90',u'不透光大型-115',u'稳态半费-40',
-                                          u'不透光中型半费-45',u'不透光大型半费-55',u'复检费-40',u'不透光小型-80',u'出租车-65',u'补打报告单-50']
+                                          u'不透光中型半费-45',u'不透光大型半费-55',u'复检费-40',u'不透光小型-80',u'出租车-65',u'出租车半费-35',u'补打报告单-50']
         self.weiqishoufei_xiangmu_jine_dic = {u'稳态收费-80':80,u'稳态半费-40':40,u'不透光中型-90':90,u'不透光大型-115':115,
                                           u'不透光中型半费-45':45,u'不透光大型半费-55':55,u'复检费-40':40,u'不透光小型-80':80,u'出租车-65':65,
-                                              u'补打报告单-50':50}
-        self.qita_xiangmu_list = ['--',u'服务费',u'反光条',u'安全锤',u'三角架',u'反光板']
+                                              u'补打报告单-50':50,u'出租车半费-35':35}
+        self.zongjian_xiangmu_list = [u'技术评定-130',u'类型划分-60',u'二级维护-115']
+        self.zongjian_xiangmu_jine_dic = {u'技术评定-130':130,u'技评+划分-190':190,u'类型划分-60':60,u'二级维护-115':115,u'技评+二维-245':245}
+        self.zongjian_cheliangleixing_list = [u'客车',u'货车',u'出租车']
+        self.qita_xiangmu_list = ['--',u'服务费',u'外廓检测',u'反光条',u'安全达标',u'安全锤',u'三角架',u'反光板',u'喷号费',u'反射器',u'紧固螺丝',u'代金券']
 
 
         self.cheliang_leixing.addItems(self.cheliang_leixing_list)
@@ -384,14 +490,16 @@ class Window(QMainWindow,Ui_MainWindow):
                                        u'闽',u'贵',u'青',u'藏',u'琼',u'粤',u'川'])
         self.chaxun_chepai_zimu.addItems(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V',
                                           'W','X', 'Y', 'Z', '--'])
+
         self.start_dateTimeEdit.setDate(datetime.date.today())#设置时间框为今天，setDateTime为设定时间
         self.FreTableOnRun()
         self.chepai_hou.editingFinished.connect(lambda :self.FinishiChePaiHou())
         self.dianhua.editingFinished.connect(lambda :self.FinishDianHua())
-
         self.cheliang_leixing.activated.connect(lambda : self.Click_cheliangleixing())#绑定下拉列表点击后的动作
         self.anjianshoufei_xiangmu.activated.connect(lambda: self.Click_anjianshoufeixiangmu())  # 绑定下拉列表点击后的动作
         self.weiqishoufei_xiangmu.activated.connect(lambda: self.Click_weiqishoufeixiangmu())
+        self.zongjian_xiangmu.activated.connect(lambda :self.Click_zongjianshoufeixiangmu())
+        self.zongjian_xiangmu_2.activated.connect(lambda :self.Click_zongjianshoufeixiangmu_2())
         self.qitajine_1.editingFinished.connect(lambda :self.FinishQitajine1())
         self.qitajine_2.editingFinished.connect(lambda: self.FinishQitajine2())
         self.qitajine_3.editingFinished.connect(lambda: self.FinishQitajine3())
@@ -402,18 +510,42 @@ class Window(QMainWindow,Ui_MainWindow):
         self.qita_xiangmu4.activated.connect(lambda: self.Click_qitashoufeixiangmu4())
         self.fukuanfangshi.activated.connect(lambda: self.Click_fukuanfangshi())
         self.button_shoukuan.clicked.connect(lambda: self.ZuHeValue())
-        #self.button_shoukuan.clicked.connect(lambda: self.ReMoveRow())
-        #self.connect(self.button_xiugaimima, SIGNAL('clicked()'), self.xiugaimima_chuangkou.exec_())
         self.button_xiugaimima.clicked.connect(lambda :self.XiuGaiMiMa())
         self.button_chexiao.clicked.connect(lambda :self.CheXiao())
         self.button_biaojikaipiao.clicked.connect(lambda :self.MarkTheInvoice())
         self.button_chaxun.clicked.connect(lambda :self.Search())
         self.button_dayin.clicked.connect(lambda :self.PrintBill())
         self.button_jiezhang.clicked.connect(lambda :self.JieZhang())
-        #self.liebiao_table.doubleClicked.connect(lambda :self.test())#TODO:测试表格双击动作
+        self.liebiao_table.doubleClicked.connect(lambda :self.test())#TODO:测试表格双击动作
         self.button_tuikuan.clicked.connect(lambda :self.tuikuan())
         self.button_fretable.clicked.connect(lambda :self.fretable())
+        self.tjrxuanze_Button.clicked.connect(lambda :self.tjrshow())
+        self.tjrdel_Button.clicked.connect(lambda :self.tjrdel())
+        #self.xinhao = tuijianren_chuangkou().xinhao
+        #self.xinhao.speak.connect(self.genggaituijianren)
+    '''
+    @Slot(str)
+    def receivslot(self,str):
+        self.str1 = str
+        if self.str1 == 'shuaxinliebiao':
+            
+            self.ReMoveRow()
+            self.FreTableOnRun()
+    '''
 
+    #@QtCore.Slot(str)
+    def tjrdel(self):
+        global TJRNAME
+        TJRNAME = ''
+        self.tuijianren.setText(TJRNAME)
+    def genggaituijianren(self,tjrname):
+        self.tuijianren.setText(TJRNAME)
+    def tjrshow(self):
+
+        self.tuijianren_chuangkou = tuijianren_chuangkou()
+        self.xinhao = self.tuijianren_chuangkou.xinhao
+        self.xinhao.speak.connect(self.genggaituijianren)
+        self.tuijianren_chuangkou.show()
     def XiuGaiMiMa(self):
         self.xiugaimima_chuankou = xiugaimima_chuangkou()
         self.xiugaimima_chuankou.exec_()
@@ -424,13 +556,15 @@ class Window(QMainWindow,Ui_MainWindow):
         self.anjian_jine = 0
         self.weiqi_jine = 0
         self.zongjian_jine = 0
+        self.zongjian_jine_2 = 0
         self.qita_jine1 = 0
         self.qita_jine2 = 0
         self.qita_jine3 = 0
         self.qita_jine4 = 0
         self.ChangeLcd()
     def ChangeLcd(self):
-        self.lcdNumber.display(self.anjian_jine + self.weiqi_jine + self.zongjian_jine+self.qita_jine1+self.qita_jine2+self.qita_jine3+self.qita_jine4)  # 控制LCD显示数字
+        self.lcdNumber.display(self.anjian_jine + self.weiqi_jine + self.zongjian_jine+self.qita_jine1
+                               +self.qita_jine2+self.qita_jine3+self.qita_jine4+self.zongjian_jine_2)  # 控制LCD显示数字
     def test(self):
         #print self.start_dateTimeEdit.dateTime().toPython()#转换为python datetime格式
         #self.label_xianjin.setText('50')#设置文本内容，只接受str
@@ -441,7 +575,8 @@ class Window(QMainWindow,Ui_MainWindow):
         for row in rows:
             index = model.index(row,0)
             id_list.append(int((model.data(index))))
-        print id_list
+
+
 
     def CheliangleixingToInt(self,cheliangleixing_str):#将车辆类型文本转化为'01'数字
         dic1 = {u'小型汽车': '02',
@@ -468,6 +603,9 @@ class Window(QMainWindow,Ui_MainWindow):
             self.SetWeiqiShoufeixiangmu()
             self.SetQitaShoufeixiangmu()
             self.SetFukuangFangshi()
+            self.SetZongjianShoufeixiangmu()
+            self.SetZongjianShoufeixiangmu_2()
+            self.SetZongjianCheliangleixing()
             self.button_chexiao.setEnabled(True)
         self.filltell()
     def SetQitaShoufeixiangmu(self):
@@ -500,6 +638,20 @@ class Window(QMainWindow,Ui_MainWindow):
         self.weiqishoufei_xiangmu.addItem('--')
         self.weiqishoufei_xiangmu.addItems(self.weiqishoufei_xiangmu_list)
 
+    def SetZongjianShoufeixiangmu(self):
+        self.zongjian_xiangmu.clear()
+        self.zongjian_xiangmu.addItem('--')
+        self.zongjian_xiangmu.addItems(self.zongjian_xiangmu_list)
+
+    def SetZongjianShoufeixiangmu_2(self):
+        self.zongjian_xiangmu_2.clear()
+        self.zongjian_xiangmu_2.addItem('--')
+        self.zongjian_xiangmu_2.addItems(self.zongjian_xiangmu_list)
+
+    def SetZongjianCheliangleixing(self):
+        self.zongjian_cheliangleixing.clear()
+        self.zongjian_cheliangleixing.addItems(self.zongjian_cheliangleixing_list)
+
     def Click_anjianshoufeixiangmu(self):
         cheliang_leixing_val = unicode(self.cheliang_leixing.currentText())
         anjianshoufeixiangmu_val = unicode(self.anjianshoufei_xiangmu.currentText())
@@ -510,8 +662,6 @@ class Window(QMainWindow,Ui_MainWindow):
             cheliangleixingint = values.get('cheliangleixing_id')
             jylb = anjianshoufeixiangmu_val.split('-')[0]
             self.VerifRePay(jylb,cph,cheliangleixingint)
-
-
         self.ChangeLcd()
 
     #点击尾气收费项目下拉列表
@@ -532,6 +682,29 @@ class Window(QMainWindow,Ui_MainWindow):
             jylb = weiqishoufeixiangmu_val.split('-')[0]
             self.VerifRePay(jylb,cph,cheliangleixingint)
 
+        self.ChangeLcd()
+
+    def Click_zongjianshoufeixiangmu(self):
+        zongjianshoufeixiangmu_val = unicode(self.zongjian_xiangmu.currentText())
+        if zongjianshoufeixiangmu_val != '--':
+            values = self.GetValue()
+            cph = values.get('chepaihao')
+            cheliangleixingint = values.get('cheliangleixing_id')
+            jylb = zongjianshoufeixiangmu_val.split('-')[0]
+            self.zongjian_jine = self.zongjian_xiangmu_jine_dic[zongjianshoufeixiangmu_val]
+            self.VerifRePay(jylb, cph, cheliangleixingint)
+        self.ChangeLcd()
+
+
+    def Click_zongjianshoufeixiangmu_2(self):
+        zongjianshoufeixiangmu_2_val = unicode(self.zongjian_xiangmu_2.currentText())
+        if zongjianshoufeixiangmu_2_val != '--':
+            values = self.GetValue()
+            cph = values.get('chepaihao')
+            cheliangleixingint = values.get('cheliangleixing_id')
+            self.zongjian_jine_2 = self.zongjian_xiangmu_jine_dic[zongjianshoufeixiangmu_2_val]
+            jylb = zongjianshoufeixiangmu_2_val.split('-')[0]
+            self.VerifRePay(jylb, cph, cheliangleixingint)
         self.ChangeLcd()
 
     def Click_qitashoufeixiangmu1(self):
@@ -571,15 +744,18 @@ class Window(QMainWindow,Ui_MainWindow):
     def FinishiChePaiHou(self):
         Chepai_zimu = self.chepai_zimu.currentText()#新车注册时不输入车牌后字母部分
         ChePai_hou = self.chepai_hou.text()
+        """
         try:
             str(ChePai_hou).upper()
         except:
             self.chepai_hou.clear()
             self.tixingkuang.setText(u"只能使用数字和字母组合且不区分大小写")
             self.tixingkuang.exec_()
+            return
+        """
         if Chepai_zimu != '--':
 
-            if len(ChePai_hou) > 5:
+            if len(ChePai_hou) > 6:
                 self.chepai_hou.clear()
                 self.tixingkuang.setText(u'车牌号码长度不正确')
                 self.tixingkuang.exec_()
@@ -642,6 +818,8 @@ class Window(QMainWindow,Ui_MainWindow):
         self.ChangeLcd()
 
     def CheXiao(self):
+        global TJRNAME
+        TJRNAME = ''
         self.chaxun_chepai_hou.clear()
         self.chepai_hou.clear()
         self.cheliang_leixing.clear()
@@ -650,6 +828,8 @@ class Window(QMainWindow,Ui_MainWindow):
         self.anjianshoufei_xiangmu.clear()
         self.is_kefu.setChecked(False)
         self.weiqishoufei_xiangmu.clear()
+        self.zongjian_xiangmu.clear()
+        self.zongjian_xiangmu_2.clear()
         self.is_zhuanru.setChecked(False)
         self.qita_xiangmu1.clear()
         self.qitajine_1.clear()
@@ -668,6 +848,7 @@ class Window(QMainWindow,Ui_MainWindow):
         self.ChangeLcdToZero()
         self.button_shoukuan.setDisabled(True)
         self.button_chexiao.setDisabled(True)
+        self.tuijianren.clear()
 
     def MarkTheInvoice(self):#标记开发票
         id_list = []
@@ -688,7 +869,8 @@ class Window(QMainWindow,Ui_MainWindow):
         self.ReMoveRow()
         self.FreTableOnRun()
 
-    def tuikuan(self):#TODO:完成退款处理
+    def tuikuan(self):
+        global ID_LIST
 
         id_list = []
         rows = self.SelectRow()
@@ -699,17 +881,24 @@ class Window(QMainWindow,Ui_MainWindow):
         if len(id_list) == 0 or len(id_list) != 1:
             self.tixingkuang.setText(u'一次只能选择一条记录')
             self.tixingkuang.exec_()
-        data = {'jczid': jcz_id, 'czry': skr_username, 'czry_pass': user_pass,'id_list':id_list}
-        lianjie = self.LianJie('tuikuan/', data)
-        fanhui = lianjie.get('chenggong')
-        if fanhui == True:
-            self.tixingkuang.setText(u'处理成功')
-            self.tixingkuang.exec_()
-        else:
-            self.tixingkuang.setText(u'发生错误')
-            self.tixingkuang.exec_()
-        self.ReMoveRow()
-        self.FreTableOnRun()
+            return
+        ID_LIST = id_list
+        self.tuikuanyuanyin()
+
+    def tuikuanyuanyin(self):
+        self.tuikuanyuanyin_chuankou = tuikuanyuanyin_chuangkou()
+        self.tuikuanyuanyin_chuankou.exec_()
+
+    def en_cn_upper(self,str_input):
+        """将中英文混合字符串转化为大写"""
+        tmplist = []
+        for i in str_input:
+            try:
+                i.upper()
+            except:
+                tmplist.append(i)
+            tmplist.append(i.upper())
+        return ''.join(tmplist)
 
 
     def GetValue(self):
@@ -717,7 +906,9 @@ class Window(QMainWindow,Ui_MainWindow):
         self.chepai_zimu_value = str(self.chepai_zimu.currentText())#车牌字母
         if self.chepai_zimu_value == '--':
             self.chepai_zimu_value = ''
-        self.chepai_hou_value = str(self.chepai_hou.text()).upper()#车牌后组合部分
+        #self.chepai_hou_value = str(self.chepai_hou.text()).upper()#车牌后组合部分
+        #self.chepai_hou_value = self.chepai_hou.text()  # 车牌后组合部分
+        self.chepai_hou_value = self.en_cn_upper(self.chepai_hou.text())
         self.chepaihao = self.chepai_qian_value+self.chepai_zimu_value+self.chepai_hou_value
         self.cheliang_leixing_value_str = unicode(self.cheliang_leixing.currentText())#车辆类型字符串
         self.cheliang_leixing_value_id = self.CheliangleixingToInt(self.cheliang_leixing_value_str)#车辆类型ID
@@ -742,6 +933,30 @@ class Window(QMainWindow,Ui_MainWindow):
             self.weiqishoufei_xiangmu_value_str = None
             self.weiqishoufei_xiangmu_value_jine = None
         self.is_zhuanru_value = self.is_zhuanru.isChecked()#是否转入
+        #判断综检收费项目并得到金额
+        self.zongjianshoufeixiangmu_value = unicode(self.zongjian_xiangmu.currentText())
+        if self.zongjianshoufeixiangmu_value != '--':
+            self.zongjianshoufeixiangmu_value_str = self.zongjianshoufeixiangmu_value.split('-')[0]
+            self.zongjianshoufeixiangmu_value_jine = int(self.zongjianshoufeixiangmu_value.split('-')[1])
+        else:
+            self.zongjianshoufeixiangmu_value_str = None
+            self.zongjianshoufeixiangmu_value_jine = None
+        #判断综检收费项目2并得到金额
+        self.zongjianshoufeixiangmu_2_value = unicode(self.zongjian_xiangmu_2.currentText())
+        if self.zongjianshoufeixiangmu_2_value != '--':
+            self.zongjianshoufeixiangmu_2_value_str = self.zongjianshoufeixiangmu_2_value.split('-')[0]
+            self.zongjianshoufeixiangmu_2_value_jine = int(self.zongjianshoufeixiangmu_2_value.split('-')[1])
+        else:
+            self.zongjianshoufeixiangmu_2_value_str = None
+            self.zongjianshoufeixiangmu_2_value_jine = None
+        self.zongjiancheliangleixing = unicode(self.zongjian_cheliangleixing)
+        if self.zongjianshoufeixiangmu_value == '--' and self.zongjianshoufeixiangmu_2_value == '--':
+            self.zongjian_cheliangleixing_str = None
+        else:
+            self.zongjian_cheliangleixing_str = unicode(self.zongjian_cheliangleixing.currentText())
+        #判断综检是否需要立即打印
+        #self.zongjianisdayin = self.zongjian_is_dayin.isChecked()
+
         #判断其他收费项目和金额
         self.qita_xiangmu1_value = unicode(self.qita_xiangmu1.currentText())
         if self.qita_xiangmu1_value != '--':
@@ -770,6 +985,7 @@ class Window(QMainWindow,Ui_MainWindow):
             self.pingzhenghao_value = str(self.pingzhenghao.text())
         else:
             self.pingzhenghao_value = None
+        self.tuijianren_input = self.tuijianren.text()
         value =  {'chepaihao':self.chepaihao,
                'cheliangleixing_str':self.cheliang_leixing_value_str,
                'cheliangleixing_id':self.cheliang_leixing_value_id,
@@ -778,6 +994,11 @@ class Window(QMainWindow,Ui_MainWindow):
                'anjianshoufei_jine':self.anjianshoufei_xiangmu_value_jine,
                'weiqishoufei_xiangmu':self.weiqishoufei_xiangmu_value_str,
                'weiqishoufei_jine':self.weiqishoufei_xiangmu_value_jine,
+               'zongjianshoufei_xiangmu':self.zongjianshoufeixiangmu_value_str,
+               'zongjianshoufei_jine':self.zongjianshoufeixiangmu_value_jine,
+               'zongjianshoufei_xiangmu_2':self.zongjianshoufeixiangmu_2_value_str,
+               'zongjianshoufei_jine_2':self.zongjianshoufeixiangmu_2_value_jine,
+               'zongjian_cheliangleixing':self.zongjian_cheliangleixing_str,
                'is_kefu':self.is_kefu_value,
                'is_zhuanru':self.is_zhuanru_value,
                'qita_xiangmu1':self.qita_xiangmu1_value,
@@ -789,13 +1010,15 @@ class Window(QMainWindow,Ui_MainWindow):
                'qita_xiangmu4': self.qita_xiangmu4_value,
                'qitajine_4': self.qitajine_4_value,
                'fukuanfangshi':self.fukuanfangshi_value,
-               'pingzhenghao':self.pingzhenghao_value}
+               'pingzhenghao':self.pingzhenghao_value,
+                'tuijianren':self.tuijianren_input}
         return value
 
     def PanDuanValue(self):
         value = self.GetValue()
-        if value.get('anjianshoufei_xiangmu') == None and value.get('weiqishoufei_xiangmu') == None and value.get('qita_xiangmu1') == '--'\
-            and value.get('qita_xiangmu2') == '--' and value.get('qita_xiangmu3') == '--' and value.get('qita_xiangmu4') == '--':
+        if value.get('anjianshoufei_xiangmu') == None and value.get('weiqishoufei_xiangmu') == None and value.get('zongjianshoufei_xiangmu') == None \
+                and value.get('qita_xiangmu1') == '--' and value.get('zongjianshoufei_xiangmu_2') == None \
+                and value.get('qita_xiangmu2') == '--' and value.get('qita_xiangmu3') == '--' and value.get('qita_xiangmu4') == '--':
             return {'panduan':False,'cuowu':u'没有任何收费项目'}
         qitaxiangmu_list = [value.get('qita_xiangmu1'),value.get('qita_xiangmu2'),
                             value.get('qita_xiangmu3'),value.get('qita_xiangmu4')]
@@ -810,67 +1033,80 @@ class Window(QMainWindow,Ui_MainWindow):
             return {'panduan':False,'cuowu':u'检查收费项目是否为0'}
 
     def ZuHeValue(self):
-        self.tixingkuang = QMessageBox()
-        panduan = self.PanDuanValue()
-        if panduan.get('panduan') != True:
 
-            self.tixingkuang.setText(u'判断值时发生错误：'+panduan.get('cuowu'))
-            self.tixingkuang.exec_()
-            return
-        values = self.GetValue()
-        if values.get('fukuanfangshi') != u'现金' and values.get('pingzhenghao') == '':
-            self.tixingkuang.setText(u'非现金支付必须填写凭证号!')
-            self.tixingkuang.exec_()
-            return
-        data = {'jczid':jcz_id,'czry':skr_username,'czry_pass':user_pass,
+        if self.verifTellNum():
+            self.tixingkuang = QMessageBox()
+            panduan = self.PanDuanValue()
+            if panduan.get('panduan') != True:
+
+                self.tixingkuang.setText(u'判断值时发生错误：'+panduan.get('cuowu'))
+                self.tixingkuang.exec_()
+                return
+            values = self.GetValue()
+            if values.get('fukuanfangshi') != u'现金' and values.get('pingzhenghao') == '':
+                self.tixingkuang.setText(u'非现金支付必须填写凭证号!')
+                self.tixingkuang.exec_()
+                return
+
+            data = {'jczid':jcz_id,'czry':skr_username,'czry_pass':user_pass,
                 'cph':values.get('chepaihao'),'pzlb':values.get('cheliangleixing_id'),
                 'pzlb_str':values.get('cheliangleixing_str'),'chezhudh':values.get('dianhua'),
-                'fkfs':values.get('fukuanfangshi'),'data':{}}
-        if values.get('anjianshoufei_xiangmu') != None:
-            qitaxiangmu_list = [values.get('qita_xiangmu1'), values.get('qita_xiangmu2'),
+                'fkfs':values.get('fukuanfangshi'),'tuijianren':values.get('tuijianren'),'data':{}}
+            if values.get('anjianshoufei_xiangmu') != None:
+                qitaxiangmu_list = [values.get('qita_xiangmu1'), values.get('qita_xiangmu2'),
                                 values.get('qita_xiangmu3'), values.get('qita_xiangmu4')]
-            fuwufei_jine = 0
-            if u'服务费' in qitaxiangmu_list:
-                fuwufei_index = qitaxiangmu_list.index(u'服务费')
-                if fuwufei_index == 0:
-                    fuwufei_jine = values.get('qitajine_1')
-                elif fuwufei_index ==1:
-                    fuwufei_jine = values.get('qitajine_2')
-                elif fuwufei_index ==2:
-                    fuwufei_jine = values.get('qitajine_3')
-                elif fuwufei_index ==3:
-                    fuwufei_jine = values.get('qitajine_4')
-            data['data']['anjian'] = {'jylb':values.get('anjianshoufei_xiangmu'),
+                fuwufei_jine = 0
+                if u'服务费' in qitaxiangmu_list:
+                    fuwufei_index = qitaxiangmu_list.index(u'服务费')
+                    if fuwufei_index == 0:
+                        fuwufei_jine = values.get('qitajine_1')
+                    elif fuwufei_index ==1:
+                        fuwufei_jine = values.get('qitajine_2')
+                    elif fuwufei_index ==2:
+                        fuwufei_jine = values.get('qitajine_3')
+                    elif fuwufei_index ==3:
+                        fuwufei_jine = values.get('qitajine_4')
+                data['data']['anjian'] = {'jylb':values.get('anjianshoufei_xiangmu'),
                                       'jfje':values.get('anjianshoufei_jine')+fuwufei_jine,
                                       'is_kefu':values.get('is_kefu')}
-        if values.get('weiqishoufei_xiangmu') != None:
-            data['data']['weiqi'] = {'jylb':values.get('weiqishoufei_xiangmu'),
+            if values.get('weiqishoufei_xiangmu') != None:
+                data['data']['weiqi'] = {'jylb':values.get('weiqishoufei_xiangmu'),
                                      'jfje':values.get('weiqishoufei_jine'),
                                      'is_zhuanru':values.get('is_zhuanru')}
-        qita_tijiao = {}
-        if values.get('qita_xiangmu1') != '--' and values.get('qita_xiangmu1') !=u'服务费':
-            qita_tijiao[values.get('qita_xiangmu1')]=values.get('qitajine_1')
-        if values.get('qita_xiangmu2') != '--' and values.get('qita_xiangmu2') !=u'服务费':
-            qita_tijiao[values.get('qita_xiangmu2')]=values.get('qitajine_2')
-        if values.get('qita_xiangmu3') != '--' and values.get('qita_xiangmu3') !=u'服务费':
-            qita_tijiao[values.get('qita_xiangmu3')]=values.get('qitajine_3')
-        if values.get('qita_xiangmu4') != '--' and values.get('qita_xiangmu4') !=u'服务费':
-            qita_tijiao[values.get('qita_xiangmu4')]=values.get('qitajine_4')
-        data['data']['qita'] = qita_tijiao
-        self.tixingkuang.setText(u'请核对所有信息，是否提交？')
-        self.tixingkuang.setStandardButtons(QMessageBox.Save |  QMessageBox.Cancel)
-        self.tixingkuang.setDefaultButton(QMessageBox.Save)
-        ret = self.tixingkuang.exec_()
-        if ret == QMessageBox.Save:
-            lianjie = self.LianJie('shoufei/',data)
-            if lianjie:
-                self.ReMoveRow()
-                self.FreTableOnRun()
-            else:
-                self.tixingkuang.setText(u'lianjie返回不正确')
-                self.tixingkuang.exec_()
-        if ret == QMessageBox.Cancel:
-            return
+            if values.get('zongjianshoufei_xiangmu') !=None:
+                data['data']['zongjian1'] = {'jylb':values.get('zongjianshoufei_xiangmu'),
+                                            'jfje':values.get('zongjianshoufei_jine'),
+                                            'zongjian_cheliangleixing':values.get('zongjian_cheliangleixing'),
+                                            }
+            if values.get('zongjianshoufei_xiangmu_2') !=None:
+                data['data']['zongjian2'] = {'jylb':values.get('zongjianshoufei_xiangmu_2'),
+                                             'jfje':values.get('zongjianshoufei_jine_2'),
+                                             'zongjian_cheliangleixing':values.get('zongjian_cheliangleixing')}
+
+            qita_tijiao = {}
+            if values.get('qita_xiangmu1') != '--' and values.get('qita_xiangmu1') !=u'服务费':
+                qita_tijiao[values.get('qita_xiangmu1')]=values.get('qitajine_1')
+            if values.get('qita_xiangmu2') != '--' and values.get('qita_xiangmu2') !=u'服务费':
+                qita_tijiao[values.get('qita_xiangmu2')]=values.get('qitajine_2')
+            if values.get('qita_xiangmu3') != '--' and values.get('qita_xiangmu3') !=u'服务费':
+                qita_tijiao[values.get('qita_xiangmu3')]=values.get('qitajine_3')
+            if values.get('qita_xiangmu4') != '--' and values.get('qita_xiangmu4') !=u'服务费':
+                qita_tijiao[values.get('qita_xiangmu4')]=values.get('qitajine_4')
+            data['data']['qita'] = qita_tijiao
+            self.tixingkuang.setText(u'请核对所有信息，是否提交？')
+            self.tixingkuang.setStandardButtons(QMessageBox.Save |  QMessageBox.Cancel)
+            self.tixingkuang.setDefaultButton(QMessageBox.Save)
+            ret = self.tixingkuang.exec_()
+            if ret == QMessageBox.Save:
+                lianjie = self.LianJie('shoufei/',data)
+                if lianjie:
+                    self.ReMoveRow()
+                    self.FreTableOnRun()
+                else:
+                    self.tixingkuang.setText(u'lianjie返回不正确')
+                    self.tixingkuang.exec_()
+            if ret == QMessageBox.Cancel:
+                return
     #程序开始运行时刷新列表并更新收款统计数据
     def FreTableOnRun(self):
         data = {'jczid':jcz_id,'czry':skr_username,'czry_pass':user_pass}
@@ -891,7 +1127,6 @@ class Window(QMainWindow,Ui_MainWindow):
         self.FreTableOnRun()
 
     def VerifRePay(self,jylb_str,cph,cheliangleixingint):
-
         data = {'jczid':jcz_id,'czry':skr_username,'czry_pass':user_pass,'jylb_str':jylb_str,'cph':cph,
                 'cheliangleixingint':cheliangleixingint}
         lianjie = self.LianJie('verifrepay/',data)
@@ -899,12 +1134,43 @@ class Window(QMainWindow,Ui_MainWindow):
             self.tixingkuang.setText(u'该车已于'+unicode((lianjie.get('skrq'))+u'缴费，是否继续缴费'))
             self.tixingkuang.addButton(u'是',QMessageBox.AcceptRole)
             self.tixingkuang.addButton(u'否',QMessageBox.RejectRole)
-
             ret = self.tixingkuang.exec_()
             if ret == QMessageBox.AcceptRole:
                 return
             if ret == QMessageBox.RejectRole:
                 self.CheXiao()
+
+    def verifTellNum(self):
+        tellNum = self.dianhua.text()
+        if tellNum:
+            data = {'jczid':jcz_id,'czry':skr_username,'czry_pass':user_pass,'tellnum':tellNum}
+            lianjie = self.LianJie('veriftellnum/',data)
+            guishudi = lianjie.get('guishudi')#归属地
+            cishu = lianjie.get('cishu')#出现次数
+            if guishudi and cishu:
+                if guishudi != u'内蒙古' or cishu >10:
+                    self.tixingkuang = QMessageBox()
+                    self.tixingkuang.setText(u'该电话号码归属地为'+guishudi+u'或者此电话号码已出现过'+str(cishu)+u',是否继续？')
+                    self.tixingkuang.addButton(u'是', QMessageBox.AcceptRole)
+                    self.tixingkuang.addButton(u'否', QMessageBox.RejectRole)
+                    ret = self.tixingkuang.exec_()
+                    if ret == QMessageBox.AcceptRole:
+                        return True
+                    if ret == QMessageBox.RejectRole:
+                        self.dianhua.clear()
+                        return False
+                else:
+                    return True
+            else:
+                self.tixingkuang.setText('guishudi or cishu is None')
+                self.tixingkuang.exec_()
+                return False
+        else:
+            return True
+
+
+
+
 
     def filltell(self):
         getval = self.GetValue()
@@ -914,9 +1180,11 @@ class Window(QMainWindow,Ui_MainWindow):
                 'cheliangleixingint':cheliangleixing_id}
         lianjie = self.LianJie('searchtell/',data)
         dianhua = lianjie.get('dianhua')
-        print dianhua
+        tjr = lianjie.get('tjr')
         if dianhua:
             self.dianhua.setText(dianhua)
+        if tjr:
+            self.tuijianren.setText(tjr)
 
 
 
@@ -940,6 +1208,8 @@ class Window(QMainWindow,Ui_MainWindow):
                     jyxm = u'尾气'
                 elif a.get('jyxm') == 'qita':
                     jyxm = u'其他'
+                elif a.get('jyxm') == 'zongjian':
+                    jyxm = u'综检'
                 is_kefu = ''
                 if a.get('is_kefu') == True:
                     is_kefu =u'客服'
@@ -977,7 +1247,7 @@ class Window(QMainWindow,Ui_MainWindow):
             return_list.append(i.row())
         return return_list
 
-    def SetLable(self,groupbypaysum):
+    def SetLable(self,groupbypaysum):#设置总计分类显示在主屏幕上
         if groupbypaysum == None:
             xianjin = 0
             weixin = 0
@@ -1001,6 +1271,8 @@ class Window(QMainWindow,Ui_MainWindow):
                     self.label_yufufeika.setText(str(i.get('skje')))
                 elif i.get('zhifufangshi_zimu') == '05':
                     self.label_yinhangka.setText(str(i.get('skje')))
+                elif i.get('zhifufangshi_zimu') == '06':
+                    self.label_naerjian.setText(str(i.get('skje')))
 
         '''
         if fkfs == u'现金':
@@ -1102,7 +1374,7 @@ class Window(QMainWindow,Ui_MainWindow):
         fasong_data = data
         url = dizhi + str_lianjie
         try:  # 处理连接时候的异常
-            resp = requests.post(url, verify=False, data=json.dumps(fasong_data))
+            resp = requests.post(url, verify=False, data=json.dumps(fasong_data),timeout=3)
         except Exception, e:
             e = repr(e)  # 避免出现中文字符
             f = open('error.log', 'a')  # 文件追加模式
@@ -1113,7 +1385,6 @@ class Window(QMainWindow,Ui_MainWindow):
             self.tixingkuang.exec_()
             sys.exit(app.exit())
         result_rep = resp.content
-
         try:  # 处理接受json的异常
             result = json.loads(result_rep)
         except:
@@ -1140,6 +1411,68 @@ class Window(QMainWindow,Ui_MainWindow):
                 sys.exit(app.exit())
             else:
                 return data
+
+class tuijianren_chuangkou(QDialog,Ui_TuiJianRen_UI_Dialog):
+    def __init__(self, parent=None):
+        super(tuijianren_chuangkou, self).__init__(parent)
+        self.setupUi(self)
+        self.xinhao = xinhao_class()
+        self.tishikuang = QMessageBox()
+        self.recommenderlist = self.getrecommenderlist()
+        #print 'recommenderlist',self.recommenderlist
+        #设置自动完成
+        completer = QCompleter()
+        self.tjrname_input.setCompleter(completer)
+        model = QStringListModel()
+        completer.setModel(model)
+        self.get_data(model)
+        self.queding_Button.clicked.connect(lambda: self.queding())
+        self.zengjia_Button.clicked.connect(lambda :self.zengjia())
+
+    def getrecommenderlist(self):
+        data = {'jczid': jcz_id}
+        lianjie = Window().LianJie('getrecommenderlist/', data)
+        recommenderlist = lianjie.get('recommenderlist')
+        return recommenderlist
+
+    def get_data(self,model):
+        model.setStringList(self.recommenderlist)
+
+    def queding(self):
+        self.nameinput = unicode(self.tjrname_input.text())
+        if self.nameinput not in self.recommenderlist:
+            self.tishikuang.setText(u'没有该人员的信息，请在输入人员电话号码后点击“添加”按钮！')
+            self.tishikuang.exec_()
+            return
+        global TJRNAME
+        TJRNAME = self.nameinput
+        self.fasongxinhao()
+        self.close()
+
+    def fasongxinhao(self):
+        #在需要发送信号的类中声明信号，然后在接收信号的类中先加入发送类的实例然后连接信号，发送类中只发送，接收类中只接收
+        self.xinhao.speak.emit('genggaituijianren')
+
+    def zengjia(self):
+        name = unicode(self.tjrname_input.text())
+        if name in self.recommenderlist:
+            self.tishikuang.setText(u'该人员已经存在于列表中，不能再添加！')
+            self.tishikuang.exec_()
+            return
+        tellnumber = self.tjrtellnumber_input.text()
+        data = {'jczid': jcz_id,'name':name,'tellnumber':tellnumber}
+        lianjie = Window().LianJie('addrecommender/', data)
+        q = lianjie.get('chenggong')
+        if q :
+            global TJRNAME
+            TJRNAME = name
+            self.fasongxinhao()
+            self.close()
+
+
+
+
+
 
 
 
