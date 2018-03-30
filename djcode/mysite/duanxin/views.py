@@ -53,7 +53,7 @@ import requests
 from xpinyin import Pinyin
 from jiami_jiemi_test import AESCipher
 from tasks import sendsms
-ip_yunxu = ['192.168.0.1','15.29.32.56','15.29.32.55','15.29.32.49','192.168.0.2']
+ip_yunxu = ['192.168.0.1','15.29.32.56','15.29.32.55','15.29.32.49','192.168.0.2','15.29.32.61','15.29.32.78']
 def tijiao(request):
 	#global jiaxiaoidglobal
 	#jiaxiaoid = int(jiaxiaoid)
@@ -399,19 +399,6 @@ def webservice_yewubaijie(requset):#业务办结存入数据库
 
         panduan = shijianchuli(paizhaohao,paizhaoleibie_id)
         if panduan.get('zhuangtai') == 'Success':
-        #conn = pymssql.connect('15.29.32.3', 'sa', 'svrcomputer', 'NewGaJck_TB')
-        #cursor = conn.cursor()
-        #cursor.execute('SELECT COUNT (*) FROM ufee WHERE CPH=%s AND PZLBID=%s',(paizhaohao,paizhaoleibie_id))
-        #qs_num = cursor.fetchall()[0][0]
-        #if not isinstance(qs_num,int):
-            #result = {'zhuangtai':'Error','zhuangtai_str':u'查询出现错误，请检查'}
-            #conn.close()
-            #return JsonResponse(result)
-        #elif  qs_num == 0:
-            #result = {'zhuangtai':'Error','zhuangtai_str':u'没有查询到该车辆对应收费信息,请核对后重新录入!'}
-            #conn.close()
-            #return JsonResponse(result)
-        #else:
             xingshizheng_baocun = DX_Xingshizheng(paizhaohao=paizhaohao,cheliangleibie_id=paizhaoleibie_id,
                                               chuanjianriqi=datetime.datetime.now(),nexttime=NetxTime)
             xingshizheng_baocun.save()
@@ -711,7 +698,7 @@ def webservice_weiqishofuei_chaxun(requset):
             result = {'is_tixing':'no'}
             return JsonResponse(result)
 
-
+        """
         conn = pymssql.connect('15.29.32.3', 'sa', 'svrcomputer', 'NewGaJck_TB')
         cursor = conn.cursor(as_dict=True)
         cursor.execute('SELECT SYXZID,CLLBXID FROM carinfo WHERE AutoID = (SELECT MAX(AutoID) FROM carinfo WHERE CPH = %s AND PZLBID = %s)',
@@ -725,15 +712,16 @@ def webservice_weiqishofuei_chaxun(requset):
         except:
             pass
         conn.close()
+        
         if len(cheliangxinxi) == 0:
             return JsonResponse({'is_tixing':'yes','tixingxinxi':u'没有找到车辆的年检信息，是否继续？'})
-
         if cheliangxinxi.get('yingyunleibie_id') == 'D':
             result = {'is_tixing': 'no'}  # 界面是否需要提醒没有尾气收费
             return JsonResponse(result)
         if cheliangxinxi.get('cheliangleibie_id') == 'N11':
             result = {'is_tixing': 'no'}
             return JsonResponse(result)
+        
         #查询尾气收费
         jieguo = {}
         conn1 = pymssql.connect('15.29.32.61', 'sa', 'svrcomputer', 'hbjcdb')
@@ -753,6 +741,12 @@ def webservice_weiqishofuei_chaxun(requset):
             return JsonResponse({'is_tixing':'no'})
         else:
             return JsonResponse({'is_tixing':'yes','tixingxinxi':u'该车90天内没有缴费记录或缴费金额小于0（尾气），是否继续？'})
+        """
+        shoufeichaxun = DX_ShouFei().searchshoufei(paizhaohao,paizhaoleibie_id)
+        if shoufeichaxun.get('chenggong') == True:
+            return JsonResponse({'is_tixing':'no'})
+        if shoufeichaxun.get('chenggong') == False:
+            return JsonResponse({'is_tixing':'yes','tixingxinxi':shoufeichaxun.get('neirong')})
     else:
         result = {'zhuangtai': 'Error', 'fanhui_msg': u'出现错误500'}
         return JsonResponse(result)
@@ -1174,6 +1168,9 @@ def JieZhangYulan(requset):#结账预览
         if jiesuanxiangmu == 'weiqi':
             kwargs['jyxm'] = 'weiqi'
             jiesuanxiangmu = u'尾气'
+        if jiesuanxiangmu == 'zongjian':
+            kwargs['jyxm'] = 'zongjian'
+            jiesuanxiangmu = u'综检'
         jiezhangriqi = jieshou_json.get('jiezhangriqi')
         shuju = []
         if jiezhangriqi == None:
@@ -1203,11 +1200,25 @@ def JieZhangYulan(requset):#结账预览
         starttime_str = shuju.earliest('id').skrq
         zhibiaodatetime = datetime.datetime.now()
         sum_jine=sum(shuju.values_list('skje',flat=True))
-        df1 = pd.DataFrame(list(shuju.values('cheliangleibie_str','jylb','zhifufangshi_str','skje','is_kefu')))
+        if jiesuanxiangmu == u'综检':
+            df1 = pd.DataFrame(list(
+                shuju.values('cheliangleibie_str', 'jylb', 'zongjian_cheliangleixing', 'zhifufangshi_str', 'skje',
+                             'is_kefu')))
+        else:
+            df1 = pd.DataFrame(list(shuju.values('cheliangleibie_str', 'jylb', 'zhifufangshi_str', 'skje', 'is_kefu')))
         df2 = pd.DataFrame(list(shuju.values('cheliangleibie_str','jylb','zhifufangshi_str','skje')))
-        df1.columns = ['车辆类别','数量','检验类别','单价','支付方式']
-        tabledata_count = df1.groupby(['支付方式','单价','车辆类别','检验类别'],as_index=True).count().to_html()
+        if jiesuanxiangmu == u'综检':
+            df1.columns = ['车辆类别', '数量', '检验类别', '单价', '支付方式', '类型']
+
+        else:
+            df1.columns = ['车辆类别', '数量', '检验类别', '单价', '支付方式']
+        if jiesuanxiangmu == u'综检':
+            tabledata_count = df1.groupby(['支付方式', '单价', '检验类别','车辆类别', '类型'], as_index=True).count().to_html()
+            #print df1
+        else:
+            tabledata_count = df1.groupby(['支付方式', '单价', '车辆类别', '检验类别'], as_index=True).count().to_html()
         sum_zhifufangshi = df2.groupby(['zhifufangshi_str'],as_index=False).sum().to_dict('recodes')
+
         #print sum_zhifufangshi
         #for i in dictolist:
             #cont_zhifufangshi.append({'zhifufangshi_str':i,'count':dictolist.get(i)})
@@ -1357,6 +1368,8 @@ def PrintBill(requset,id):#单独打印票据
     except:
         return Http404
     fphm = qs.dyid
+    if fphm == None:
+        fphm = qs.id
     skrq = str(qs.skrq)[:23]
     cph = qs.paizhaohao
     jyxm = qs.jyxm
@@ -1364,6 +1377,8 @@ def PrintBill(requset,id):#单独打印票据
         jyxm = u'安检检测收费'
     elif jyxm == 'weiqi':
         jyxm = u'尾气检测收费'
+    elif jyxm == 'zongjian':
+        jyxm = u'综检检测收费'
     elif jyxm == 'qita':
         jyxm = u'其他检测项目'
     cheliangleibie_str = qs.cheliangleibie_str
@@ -1512,6 +1527,44 @@ def ShouFeiChuLi_1(jczid,cph,pzlb_int,pzlb_str,chezhudh,czry,czry_user,fkfs_id,f
                            skje=jfje,zhifufangshi_zimu=fkfs_id,zhifufangshi_str=fkfs,is_tuikuan=is_tuikuan,
                            bjr=bjr, bjr_username=bjr_username,tuikuan_riqi=tuikuan_riqi,tuikuan_shuoming=tuikuanyuanyin)
             q.save()
+
+        if i == 'zongjian1':
+            jylb = data.get(i).get('jylb')
+            jfje = data.get(i).get('jfje')
+            zongjian_cheliangleibie = data.get(i).get('zongjian_cheliangleixing')
+            q = DX_ShouFei(jczid=jczid,paizhaohao=cph,cheliangleibie_id=pzlb_int,
+                           cheliangleibie_str=pzlb_str,chezhudianhua=chezhudh,
+                           jyxm='zongjian',jylb=jylb,zongjian_cheliangleixing=zongjian_cheliangleibie,
+                           skr=czry,skr_username=czry_user,skrq=datetime.datetime.now(),
+                           skje=jfje,zhifufangshi_zimu=fkfs_id,zhifufangshi_str=fkfs,is_tuikuan=is_tuikuan,
+                           bjr=bjr,bjr_username=bjr_username,tuikuan_riqi=tuikuan_riqi,tuikuan_shuoming=tuikuanyuanyin)
+            q.save()
+
+
+        if i == 'zongjian2':
+            jylb = data.get(i).get('jylb')
+            jfje = data.get(i).get('jfje')
+            zongjian_cheliangleibie = data.get(i).get('zongjian_cheliangleixing')
+            q = DX_ShouFei(jczid=jczid,paizhaohao=cph,cheliangleibie_id=pzlb_int,
+                           cheliangleibie_str=pzlb_str,chezhudianhua=chezhudh,
+                           jyxm='zongjian',jylb=jylb,zongjian_cheliangleixing=zongjian_cheliangleibie,
+                           skr=czry,skr_username=czry_user,skrq=datetime.datetime.now(),
+                           skje=jfje,zhifufangshi_zimu=fkfs_id,zhifufangshi_str=fkfs,is_tuikuan=is_tuikuan,
+                           bjr=bjr,bjr_username=bjr_username,tuikuan_riqi=tuikuan_riqi,tuikuan_shuoming=tuikuanyuanyin)
+            q.save()
+
+        if i == 'zongjian':
+            jylb = data.get(i).get('jylb')
+            jfje = data.get(i).get('jfje')
+            zongjian_cheliangleibie = data.get(i).get('zongjian_cheliangleixing')
+            q = DX_ShouFei(jczid=jczid,paizhaohao=cph,cheliangleibie_id=pzlb_int,
+                           cheliangleibie_str=pzlb_str,chezhudianhua=chezhudh,
+                           jyxm='zongjian',jylb=jylb,zongjian_cheliangleixing=zongjian_cheliangleibie,
+                           skr=czry,skr_username=czry_user,skrq=datetime.datetime.now(),
+                           skje=jfje,zhifufangshi_zimu=fkfs_id,zhifufangshi_str=fkfs,is_tuikuan=is_tuikuan,
+                           bjr=bjr,bjr_username=bjr_username,tuikuan_riqi=tuikuan_riqi,tuikuan_shuoming=tuikuanyuanyin)
+            q.save()
+
         if i == 'qita':
             #这里的处理是为了兼容退款时发回的data数据格式不一致，缴费时发送的格式为{u'\u53cd\u5149\u6761': 20, u'\u53cd\u5149\u677f': 30}
             #退款时发送的data为{'jylb': u'\u5b89\u5168\u9524', 'jfje': -50}
@@ -1914,7 +1967,133 @@ def addrecommender(requset):
         else:
             return JsonResponse({'chenggong':False,'cuowu':q.get('cuowu')})
 
+def weiqi_readshoufei(requset):
+    if requset.method == 'POST':
+        #验证IP地址
+        try:
+            ip =requset.META['REMOTE_ADDR']
+        except:
+            return JsonResponse({'dengliu':False,'cuowu':u'访问地址不匹配01'})
 
+        if ip not in ip_yunxu:
+            return JsonResponse({'denglu':False,'cuowu':u'%s访问地址不匹配02' % ip})
+        #处理json
+        try:
+            jieshou_json = json.loads(requset.body)
+        except ValueError:
+            return JsonResponse({'denglu':False,'cuowu':u'数据格式不对'})
+        tongbu_username = jieshou_json['tongbu_username']
+        tongbu_password = jieshou_json['password']
+        yanzheng = DX_ShouFei_UserName().UserDengLu(tongbu_username,tongbu_password)
+        if yanzheng.get('denglu') == True:
+            today = datetime.date.today()
+            startday = today - datetime.timedelta(days=30)
+            endday = today + datetime.timedelta(days=1)
+            qs_list = DX_ShouFei().getweiqitongbushoufei(startday,endday)
+            if qs_list:
+                cphdic = {}
+                for i in qs_list:
+                    cph,chepai_leibie,jfje,is_tuikuan,jkrq,cheliangleibie_str = i
+                    if is_tuikuan:#如果最后一笔的退款状态为已退款，则重新查询退款状态
+                        is_tuikuan = DX_ShouFei().decrefund(startday,endday,cph,chepai_leibie)
+                    getchp = weiqi_cphzhuanhuan(cph,chepai_leibie)
+                    jkrqstr = str(jkrq)[:19]
+                    cphdic[getchp] = {'jfje':jfje,
+                                      'is_tuikuan':is_tuikuan,
+                                      'jkrq':jkrqstr,
+                                      'cheliangleibie_id':chepai_leibie,
+                                      'cheliangleibie_str':cheliangleibie_str}
+                return JsonResponse({'chenggong':True,'data':cphdic})
+            else:
+                return JsonResponse({'chenggong':False})
+        else:
+            return JsonResponse({'denglu':False,'cuowu':yanzheng.get('cuowu')})
+#TODO:增加返回配置的功能
+def getshoufeiconfig(requset):
+    if requset.method == 'POST':
+        #验证IP地址
+        try:
+            ip =requset.META['REMOTE_ADDR']
+        except:
+            return JsonResponse({'dengliu':False,'cuowu':u'访问地址不匹配01'})
+
+        if ip not in ip_yunxu:
+            return JsonResponse({'denglu':False,'cuowu':u'%s访问地址不匹配02' % ip})
+        #处理json
+        try:
+            jieshou_json = json.loads(requset.body)
+        except ValueError:
+            return JsonResponse({'denglu':False,'cuowu':u'数据格式不对'})
+        skr_username = jieshou_json['skr_username']
+        password = jieshou_json['password']
+        yanzheng = DX_ShouFei_UserName().UserDengLu(skr_username,password)
+        if yanzheng.get('denglu') == True:
+            fukuanfangshi = DX_ShouFei_Config_FuKuanFangShi().getfukuanfangshi()
+            if fukuanfangshi:
+                return JsonResponse({'fukuanfangshi':fukuanfangshi})
+            else:
+                return JsonResponse({'chenggong':False})
+        else:
+            return JsonResponse({'denglu':False,'cuowu':yanzheng.get('cuowu')})
+
+def weiqi_cphzhuanhuan(cph,chepai_leibie):
+    if chepai_leibie == '02':
+        return u'蓝' + cph
+    elif chepai_leibie == '01':
+        return u'黄' + cph
+    elif chepai_leibie == '13':
+        return u'农黄' + cph
+    elif chepai_leibie == '16':
+        return u'黄' + cph
+    elif chepai_leibie == '24':
+        return u'白' + cph
+    elif chepai_leibie == '07':
+        return u'黄' + cph
+
+def weiqi_codetostr(requset):
+    if requset.method == 'POST':
+        #验证IP地址
+        try:
+            ip =requset.META['REMOTE_ADDR']
+        except:
+            return JsonResponse({'dengliu':False,'cuowu':u'访问地址不匹配01'})
+
+        if ip not in ip_yunxu:
+            return JsonResponse({'denglu':False,'cuowu':u'%s访问地址不匹配02' % ip})
+        #处理json
+        try:
+            jieshou_json = json.loads(requset.body)
+        except ValueError:
+            return JsonResponse({'denglu':False,'cuowu':u'数据格式不对'})
+        basestr = jieshou_json.get('basestr')
+        if basestr == None or basestr == '' or basestr == ' ':
+            return JsonResponse({'chenggong': False, 'cuowu': u'basestrcuowu'})
+        tongbu_username = jieshou_json['tongbu_username']
+        tongbu_password = jieshou_json['password']
+        yanzheng = DX_ShouFei_UserName().UserDengLu(tongbu_username,tongbu_password)
+        if yanzheng.get('denglu') == True:
+            url = 'https://way.jd.com/showapi/checkcode_ys'
+            datastr = 'img_base64=' + basestr
+            params = {
+                'typeId': '34',
+                'convert_to_jpg': '1',
+                'appkey': 'f2a58b43cdc3bdfd31962fdf87b9dd88'
+            }
+            response = requests.post(url, params=params, data=datastr,timeout = 10)
+            try:
+                jieguo = response.json()
+            except:
+                return JsonResponse({'chenggong':False,'cuowu':u'验证码网页返回失败'})
+            print 'jieguo',jieguo
+            if jieguo['code'] != '10000':
+                return JsonResponse({'chenggong': False, 'cuowu': u'验证码网页返回值错误'+jieguo['code']})
+            if jieguo['result'].get('showapi_res_code') != 0:
+                return JsonResponse({'chenggong': False, 'cuowu': u'验证码网页返回showapi_res_code错误' + str(jieguo['result'].get('showapi_res_code'))})
+            codestr = jieguo['result'].get('showapi_res_body').get('Result')
+            print 'codestr',codestr
+            return JsonResponse({'chenggong':True,'data':codestr})
+        else:
+            return JsonResponse({'denglu':False,'cuowu':yanzheng.get('cuowu')})
 
 
 class weiqi_zhuangtaichaxun:#尾气状态查询
