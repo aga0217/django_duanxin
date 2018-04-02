@@ -2029,8 +2029,32 @@ def getshoufeiconfig(requset):
         yanzheng = DX_ShouFei_UserName().UserDengLu(skr_username,password)
         if yanzheng.get('denglu') == True:
             fukuanfangshi = DX_ShouFei_Config_FuKuanFangShi().getfukuanfangshi()
-            if fukuanfangshi:
-                return JsonResponse({'fukuanfangshi':fukuanfangshi})
+            cheliangleixing = DX_ShouFei_Config_CheLiangLeiXing().getcheliangleixing()
+            chepaiqian = DX_ShouFei_Config_ChePaiQian().getchepaiqian()
+            chepaizimu = DX_ShouFei_Config_ChePaiZiMu().getchepaizimu()
+            chaxunshoufeixiangmu = DX_ShouFei_Config_ChaXunShouFeiXiangMu().getchaxunshoufeixiangmu()
+            anjianshoufeixiangmudic = DX_ShouFei_Config_AnJianShouFeiXiangMuDic().getanjianshoufeixiangmudic()
+            weiqishoufeixiangmu = DX_ShouFei_Config_WeiQiShouFeiXiangMu().getweiqishoufeixiangmu()
+            zongjianshoufeixiangmu = DX_ShouFei_Config_ZongJianXiangMu().getzongjianshoufeixiangmu()
+            zongjiancheliangleixing = DX_ShouFei_Config_ZongJianCheLiangLeiXing().getzongjiancheliangleixing()
+            qitaxiangmu = DX_ShouFei_Config_QiTaXiangMu().getqitaxiangmu()
+            cheliangleixingtoint = DX_ShouFei_Config_CheLiangLeiXingToInt().getcheliangleixingtoint()
+            if fukuanfangshi and cheliangleixing and chepaiqian and chepaizimu\
+                    and chaxunshoufeixiangmu and anjianshoufeixiangmudic\
+                    and weiqishoufeixiangmu and zongjianshoufeixiangmu\
+                    and zongjiancheliangleixing and qitaxiangmu\
+                    and cheliangleixingtoint:
+                return JsonResponse({'fukuanfangshi':fukuanfangshi,
+                                     'cheliangleixing':cheliangleixing,
+                                     'chepaiqian':chepaiqian,
+                                     'chepaizimu':chepaizimu,
+                                     'chaxunshoufeixiangmu':chaxunshoufeixiangmu,
+                                     'anjianshoufeixiangmudic':anjianshoufeixiangmudic,
+                                     'weiqishoufeixiangmu':weiqishoufeixiangmu,
+                                     'zongjianshoufeixiangmu':zongjianshoufeixiangmu,
+                                     'zongjiancheliangleixing':zongjiancheliangleixing,
+                                     'qitaxiangmu':qitaxiangmu,
+                                     'cheliangleixingtoint':cheliangleixingtoint})
             else:
                 return JsonResponse({'chenggong':False})
         else:

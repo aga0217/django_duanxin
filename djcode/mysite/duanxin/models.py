@@ -514,6 +514,111 @@ class DX_ShouFei_Config_FuKuanFangShi(models.Model):
             fukuanfangshi.append(i[0])
         return fukuanfangshi
 
+class DX_ShouFei_Config_CheLiangLeiXing(models.Model):
+    cheliangleixing = models.CharField(max_length=100,verbose_name=u'车辆类型列表')
+    isuse = models.BooleanField(default=True)
+    def getcheliangleixing(self):
+        cheliangleixing = []
+        qs = DX_ShouFei_Config_CheLiangLeiXing.objects.filter(isuse = True).order_by('id').values_list('cheliangleixing')
+        for i in qs:
+            cheliangleixing.append(i[0])
+        return cheliangleixing
+
+class DX_ShouFei_Config_ChePaiQian(models.Model):
+    chepaiqian = models.CharField(max_length=100,verbose_name=u'车牌省份简称')
+    isuse = models.BooleanField(default=True)
+    count = models.IntegerField(null=True,verbose_name=u'省份简称出现的次数')#为今后的动态排序提供基础
+    def getchepaiqian(self):
+        chepaiqian = []
+        qs = DX_ShouFei_Config_ChePaiQian.objects.filter(isuse=True).order_by('id').values_list('chepaiqian')
+        for i in qs:
+            chepaiqian.append(i[0])
+        return chepaiqian
+
+class DX_ShouFei_Config_ChePaiZiMu(models.Model):
+    chepaizimu = models.CharField(max_length=10,verbose_name=u'车牌字母')
+    isuse = models.BooleanField(default=True)
+    def getchepaizimu(self):
+        chepaizimu = []
+        qs = DX_ShouFei_Config_ChePaiZiMu.objects.filter(isuse=True).order_by('id').values_list('chepaizimu')
+        for i in qs:
+            chepaizimu.append(i[0])
+        return chepaizimu
+
+class DX_ShouFei_Config_ChaXunShouFeiXiangMu(models.Model):
+    chaxunshoufeixiangmu = models.CharField(max_length=50,verbose_name=u'查询收费项目')
+    isuse = models.BooleanField(default=True)
+    def getchaxunshoufeixiangmu(self):
+        chaxunshoufeixiangmu = []
+        qs = DX_ShouFei_Config_ChaXunShouFeiXiangMu.objects.filter(isuse=True).order_by('id').values_list('chaxunshoufeixiangmu')
+        for i in qs:
+            chaxunshoufeixiangmu.append(i[0])
+        return chaxunshoufeixiangmu
+
+class DX_ShouFei_Config_AnJianShouFeiXiangMuDic(models.Model):
+    cheliangleixing_id = models.CharField(max_length=2,verbose_name=u'车辆类型id')
+    shoufeixiangmu = models.CharField(max_length=200,verbose_name=u'收费项目')
+    def getanjianshoufeixiangmudic(self):
+        anjianshoufeixiangmudic = {}
+        qs = DX_ShouFei_Config_AnJianShouFeiXiangMuDic.objects.all()
+        for i in qs:
+            shoufeixiangmulist = i.shoufeixiangmu.split(',')
+            anjianshoufeixiangmudic[i.cheliangleixing_id] = shoufeixiangmulist
+        return anjianshoufeixiangmudic
+
+class DX_ShouFei_Config_WeiQiShouFeiXiangMu(models.Model):
+    weiqishoufeixiangmu = models.CharField(max_length=200,verbose_name=u'尾气收费项目')
+    isuse = models.BooleanField(default=True)
+    count = models.IntegerField(default=0,verbose_name=u'收费项目计数')
+    def getweiqishoufeixiangmu(self):
+        weiqishoufeixiangmu = []
+        qs = DX_ShouFei_Config_WeiQiShouFeiXiangMu.objects.filter(isuse=True).order_by('id').values_list('weiqishoufeixiangmu')
+        for i in qs:
+            weiqishoufeixiangmu.append(i[0])
+        return weiqishoufeixiangmu
+
+class DX_ShouFei_Config_ZongJianXiangMu(models.Model):
+    zongjianxiangmu = models.CharField(max_length=200,verbose_name=u'综检收费项目')
+    isuse = models.BooleanField(default=True)
+    count = models.IntegerField(default=0,verbose_name=u'收费项目计数')
+    def getzongjianshoufeixiangmu(self):
+        zongjianshoufeixiangmu = []
+        qs = DX_ShouFei_Config_ZongJianXiangMu.objects.filter(isuse=True).order_by('id').values_list('zongjianxiangmu')
+        for i in qs:
+            zongjianshoufeixiangmu.append(i[0])
+        return zongjianshoufeixiangmu
+
+class DX_ShouFei_Config_ZongJianCheLiangLeiXing(models.Model):
+    zongjiancheliangleixing = models.CharField(max_length=200,verbose_name=u'综检收费项目')
+    isuse = models.BooleanField(default=True)
+    count = models.IntegerField(default=0,verbose_name=u'收费项目计数')
+    def getzongjiancheliangleixing(self):
+        zongjiancheliangleixing = []
+        qs = DX_ShouFei_Config_ZongJianCheLiangLeiXing.objects.filter(isuse=True).order_by('id').values_list('zongjiancheliangleixing')
+        for i in qs:
+            zongjiancheliangleixing.append(i[0])
+        return zongjiancheliangleixing
+
+class DX_ShouFei_Config_QiTaXiangMu(models.Model):
+    qitaxiangmu = models.CharField(max_length=200,verbose_name=u'其他收费项目')
+    isuse = models.BooleanField(default=True)
+    count = models.IntegerField(default=0,verbose_name=u'收费项目计数')
+    def getqitaxiangmu(self):
+        qitaxiangmu = []
+        qs = DX_ShouFei_Config_QiTaXiangMu.objects.filter(isuse=True).order_by('id').values_list('qitaxiangmu')
+        for i in qs:
+            qitaxiangmu.append(i[0])
+        return qitaxiangmu
+
+class DX_ShouFei_Config_CheLiangLeiXingToInt(models.Model):
+    cheliangleixing = models.CharField(max_length=200,verbose_name=u'车辆类型')
+    leixingint = models.CharField(max_length=2,verbose_name=u'车辆类型对应int')
+    def getcheliangleixingtoint(self):
+        dic1 = {}
+        qs = DX_ShouFei_Config_CheLiangLeiXingToInt.objects.all()
+        for i in qs:
+            dic1[i.cheliangleixing] = i.leixingint
+        return dic1
 class SendSMS(object):
     help = u'使用异步方式发送短信以取代定时发送机制'
     aes_cipher = AESCipher()
