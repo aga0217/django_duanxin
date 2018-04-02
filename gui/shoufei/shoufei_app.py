@@ -74,7 +74,6 @@ class denglu_chuangkou(QDialog,Ui_denglu_Dialog):
         global SHOUFEICONFIG
         try:  # 处理接受json的异常
             SHOUFEICONFIG = json.loads(result_rep)
-            print SHOUFEICONFIG
         except:
             f = open('error.log', 'a')
             f.write(result_rep)
@@ -435,62 +434,29 @@ class Window(QMainWindow,Ui_MainWindow):
         #self.button_dayin.setDisabled((True))
         #self.button_jiezhang.setDisabled(True)
         #self.button_biaojikaipiao.setDisabled(True)
-        #TODO:将fukuangfangshi_list更改为由SHOUFEICONFIG获得(付款方式已成功，需继续修改其他配置)
-        #self.fukuangfangshi_list = [u'现金',u'微信支付',u'支付宝支付',u'银行卡',u'哪儿检',u'预付费卡']
+        #将fukuangfangshi_list更改为由SHOUFEICONFIG获得
         self.fukuangfangshi_list = SHOUFEICONFIG['fukuanfangshi']
-        self.cheliang_leixing_list = ['--',u'小型汽车',u'大型汽车',u'挂车',u'两、三轮摩托车',u'教练汽车',u'农用运输车',u'警用汽车',
-                                     u'警用摩托车',u'轻便摩托车',u'外籍汽车']
-        self.chepai_qian.addItems([u'蒙',u'京',u'津',u'沪',u'渝',u'冀',u'豫',u'云',u'辽',u'黑',u'湘',
-                                       u'皖',u'鲁',u'新',u'苏',u'浙',u'赣',u'桂',u'甘',u'晋',u'陕',u'吉',
-                                       u'闽',u'贵',u'青',u'藏',u'琼',u'粤',u'川',u'宁',u'鄂'])
-        self.chepai_zimu.addItems(['--','A','B','C','D','E','F','G','H','J','K','L','M','N','O','P','Q','R','S','T','U','V','W',
-                                   'X','Y','Z'])
-        self.chaxun_shoufeixiangmu.addItems(['--',u'安检',u'尾气',u'综检',u'其他'])
-        self.anjianshoufei_xiangmu_dic = {'02':[u'在用机动车检验-90',u'注册登记检验-90',u'过户提档-90',u'事故车辆检验-100',
-                                                u'在用机动车检验-65',u'在用机动车检验-56',u'在用机动车检验-48'],
-                                          '01':[u'在用机动车检验-110',u'注册登记检验-110',u'过户提档-110',u'事故车辆检验-100'],
-                                          '15':[u'在用机动车检验-90',u'注册登记检验-90',u'过户提档-90',u'事故车辆检验-100'],
-                                          '07':[u'在用机动车检验-70',u'注册登记检验-70',u'过户提档-70',u'事故车辆检验-100'],
-                                          '06':[u'在用机动车检验-90',u'注册登记检验-90',u'过户提档-90',u'事故车辆检验-100'],
-                                          '13':[u'在用机动车检验-110',u'在用机动车检验-70',u'注册登记检验-110',u'过户提档-110',u'事故车辆检验-100'],
-                                          '16':[u'在用机动车检验-110',u'注册登记检验-110',u'过户提档-110',u'事故车辆检验-100'],
-                                          '23':[u'在用机动车检验-90',u'在用机动车检验-110',u'临时检验-280',u'临时检验-319'],
-                                          '24':[u'在用机动车检验-70',u'注册登记检验-70',u'过户提档-70',u'事故车辆检验-100'],
-                                          '08':[u'在用机动车检验-70',u'注册登记检验-70',u'过户提档-70',u'事故车辆检验-100']
-
-                                          }
-        self.anjianshoufei_xiangmu_jine_dic = {'02':{u'在用机动车检验-90':90,u'注册登记检验-90':90,u'过户提档-90':90,u'事故车辆检验-100':100,
-                                                u'在用机动车检验-65':65,u'在用机动车检验-56':56,u'在用机动车检验-48':48},
-                                               '01':{u'在用机动车检验-110':110,u'注册登记检验-110':110,u'过户提档-110':110,u'事故车辆检验-100':100},
-                                               '15':{u'在用机动车检验-90':90,u'注册登记检验-90':90,u'过户提档-90':90,u'事故车辆检验-100':100},
-                                               '07':{u'在用机动车检验-70':70,u'注册登记检验-70':70,u'过户提档-70':70,u'事故车辆检验-100':100},
-                                               '06':{u'在用机动车检验-90':90,u'注册登记检验-90':90,u'过户提档-90':90,u'事故车辆检验-100':100},
-                                               '13':{u'在用机动车检验-110':110,u'注册登记检验-110':110,u'过户提档-110':110,u'在用机动车检验-70':70,u'事故车辆检验100':100},
-                                               '16':{u'在用机动车检验-110':110,u'注册登记检验-110':110,u'过户提档-110':110,u'事故车辆检验-100':110},
-                                               '23':{u'在用机动车检验-90':90,u'在用机动车检验-110':110,u'临时检验-280':280,u'临时检验-319':319},
-                                               '24':{u'在用机动车检验-70':70,u'注册登记检验-70':70,u'过户提档-70':70,u'事故车辆检验-100':100},
-                                               '08': {u'在用机动车检验-70': 70, u'注册登记检验-70': 70, u'过户提档-70': 70,
-                                                      u'事故车辆检验-100': 100},
-                                               }
-        self.weiqishoufei_xiangmu_list = [u'稳态收费-80',u'不透光中型-90',u'不透光大型-115',u'稳态半费-40',
-                                          u'不透光中型半费-45',u'不透光大型半费-55',u'复检费-40',u'不透光小型-80',u'出租车-65',u'出租车半费-35',u'补打报告单-50']
-        self.weiqishoufei_xiangmu_jine_dic = {u'稳态收费-80':80,u'稳态半费-40':40,u'不透光中型-90':90,u'不透光大型-115':115,
-                                          u'不透光中型半费-45':45,u'不透光大型半费-55':55,u'复检费-40':40,u'不透光小型-80':80,u'出租车-65':65,
-                                              u'补打报告单-50':50,u'出租车半费-35':35}
-        self.zongjian_xiangmu_list = [u'技术评定-130',u'类型划分-60',u'二级维护-115']
-        self.zongjian_xiangmu_jine_dic = {u'技术评定-130':130,u'技评+划分-190':190,u'类型划分-60':60,u'二级维护-115':115,u'技评+二维-245':245}
-        self.zongjian_cheliangleixing_list = [u'客车',u'货车',u'出租车']
-        self.qita_xiangmu_list = ['--',u'服务费',u'外廓检测',u'反光条',u'安全达标',u'安全锤',u'三角架',u'反光板',u'喷号费',u'反射器',u'紧固螺丝',u'代金券']
-
-
+        #将cheliang_leixing_list更改为由SHOUFEICONFIG获得
+        self.cheliang_leixing_list = SHOUFEICONFIG['cheliangleixing']
+        #将chepai_qian更改为由SHOUFEICONFIG获得
+        self.chepai_qian.addItems(SHOUFEICONFIG['chepaiqian'])
+        #将chepai_zimu更改为由SHOUFEICONFIG获得
+        self.chepai_zimu.addItems(SHOUFEICONFIG['chepaizimu'])
+        #将chaxun_shoufeixiangmu更改为由SHOUFEICONFIG获得
+        self.chaxun_shoufeixiangmu.addItems(SHOUFEICONFIG['chaxunshoufeixiangmu'])
+        #将anjianshoufei_xiangmu_dic更改为由SHOUFEICONFIG获得
+        self.anjianshoufei_xiangmu_dic = SHOUFEICONFIG['anjianshoufeixiangmudic']
+        #将weiqishoufei_xiangmu_list更改为由SHOUFEICONFIG获得
+        self.weiqishoufei_xiangmu_list = SHOUFEICONFIG['weiqishoufeixiangmu']
+        #将zongjian_xiangmu_list更改为由SHOUFEICONFIG获得
+        self.zongjian_xiangmu_list = SHOUFEICONFIG['zongjianshoufeixiangmu']
+        #将zongjian_cheliangleixing_list更改为由SHOUFEICONFIG获得
+        self.zongjian_cheliangleixing_list = SHOUFEICONFIG['zongjiancheliangleixing']
+        #将qita_xiangmu_list更改为由SHOUFEICONFIG获得
+        self.qita_xiangmu_list = SHOUFEICONFIG['qitaxiangmu']
         self.cheliang_leixing.addItems(self.cheliang_leixing_list)
-
-        self.chaxun_chepai_qian.addItems([u'蒙',u'京',u'津',u'沪',u'渝',u'冀',u'豫',u'云',u'辽',u'黑',u'湘',
-                                       u'皖',u'鲁',u'新',u'苏',u'浙',u'赣',u'桂',u'甘',u'晋',u'陕',u'吉',
-                                       u'闽',u'贵',u'青',u'藏',u'琼',u'粤',u'川'])
-        self.chaxun_chepai_zimu.addItems(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V',
-                                          'W','X', 'Y', 'Z', '--'])
-
+        self.chaxun_chepai_qian.addItems(SHOUFEICONFIG['chepaiqian'])
+        self.chaxun_chepai_zimu.addItems(SHOUFEICONFIG['chepaizimu'])
         self.start_dateTimeEdit.setDate(datetime.date.today())#设置时间框为今天，setDateTime为设定时间
         self.FreTableOnRun()
         self.chepai_hou.editingFinished.connect(lambda :self.FinishiChePaiHou())
@@ -579,16 +545,7 @@ class Window(QMainWindow,Ui_MainWindow):
 
 
     def CheliangleixingToInt(self,cheliangleixing_str):#将车辆类型文本转化为'01'数字
-        dic1 = {u'小型汽车': '02',
-                u'大型汽车': '01',
-                u'挂车': '15',
-                u'农用运输车': '13',
-                u'警用汽车': '23',
-                u'两、三轮摩托车': '07',
-                u'外籍汽车': '06',
-                u'轻便摩托车': '08',
-                u'教练汽车': '16',
-                u'警用摩托车': '24'}
+        dic1 = SHOUFEICONFIG['cheliangleixingtoint']
         return dic1[cheliangleixing_str]
 
     def Click_cheliangleixing(self):#点击车辆类型
@@ -653,10 +610,11 @@ class Window(QMainWindow,Ui_MainWindow):
         self.zongjian_cheliangleixing.addItems(self.zongjian_cheliangleixing_list)
 
     def Click_anjianshoufeixiangmu(self):
-        cheliang_leixing_val = unicode(self.cheliang_leixing.currentText())
+        #cheliang_leixing_val = unicode(self.cheliang_leixing.currentText())
         anjianshoufeixiangmu_val = unicode(self.anjianshoufei_xiangmu.currentText())
         if anjianshoufeixiangmu_val != '--':
-            self.anjian_jine = self.anjianshoufei_xiangmu_jine_dic[self.CheliangleixingToInt(cheliang_leixing_val)][anjianshoufeixiangmu_val]
+            #self.anjian_jine = self.anjianshoufei_xiangmu_jine_dic[self.CheliangleixingToInt(cheliang_leixing_val)][anjianshoufeixiangmu_val]
+            self.anjian_jine = int(anjianshoufeixiangmu_val.split('-')[1])#将金额的获取方式更改为由项目后的数字部分直接提供
             values = self.GetValue()
             cph = values.get('chepaihao')
             cheliangleixingint = values.get('cheliangleixing_id')
@@ -668,7 +626,7 @@ class Window(QMainWindow,Ui_MainWindow):
     def Click_weiqishoufeixiangmu(self):
         weiqishoufeixiangmu_val = unicode(self.weiqishoufei_xiangmu.currentText())
         if weiqishoufeixiangmu_val != '--':
-            self.weiqi_jine = self.weiqishoufei_xiangmu_jine_dic[weiqishoufeixiangmu_val]
+            self.weiqi_jine = int(weiqishoufeixiangmu_val.split('-')[1])#将尾气收费金额的获取方式更改为直接读取收费项目的数字部分
             values = self.GetValue()
             cph = values.get('chepaihao')
             cheliangleixingint = values.get('cheliangleixing_id')
@@ -691,7 +649,8 @@ class Window(QMainWindow,Ui_MainWindow):
             cph = values.get('chepaihao')
             cheliangleixingint = values.get('cheliangleixing_id')
             jylb = zongjianshoufeixiangmu_val.split('-')[0]
-            self.zongjian_jine = self.zongjian_xiangmu_jine_dic[zongjianshoufeixiangmu_val]
+            #self.zongjian_jine = self.zongjian_xiangmu_jine_dic[zongjianshoufeixiangmu_val]
+            self.zongjian_jine = int(zongjianshoufeixiangmu_val.split('-')[1])
             self.VerifRePay(jylb, cph, cheliangleixingint)
         self.ChangeLcd()
 
@@ -702,7 +661,7 @@ class Window(QMainWindow,Ui_MainWindow):
             values = self.GetValue()
             cph = values.get('chepaihao')
             cheliangleixingint = values.get('cheliangleixing_id')
-            self.zongjian_jine_2 = self.zongjian_xiangmu_jine_dic[zongjianshoufeixiangmu_2_val]
+            self.zongjian_jine_2 = int(zongjianshoufeixiangmu_2_val.split('-')[1])
             jylb = zongjianshoufeixiangmu_2_val.split('-')[0]
             self.VerifRePay(jylb, cph, cheliangleixingint)
         self.ChangeLcd()
