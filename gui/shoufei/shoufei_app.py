@@ -4,7 +4,10 @@ import os
 from PySide.QtGui import *
 from PySide.QtCore import *
 from PySide import QtCore
-from PySide.QtWebKit import *
+try:
+    from PySide.QtWebKit import *
+except:
+    from PySide import QtWebKit
 from denglu_ui import Ui_denglu_Dialog
 from shoufei_ui import Ui_MainWindow
 from xiugaimima_ui import Ui_xiugaimima_Dialog
@@ -16,8 +19,8 @@ import datetime
 import re
 import json
 import requests
-from xhtml2pdf import pisa
-import testprint
+#from xhtml2pdf import pisa
+#import testprint
 requests.packages.urllib3.disable_warnings()#关闭证书的安全提示
 dizhi = ''
 skr_username = ''
@@ -1010,7 +1013,8 @@ class Window(QMainWindow,Ui_MainWindow):
             data = {'jczid':jcz_id,'czry':skr_username,'czry_pass':user_pass,
                 'cph':values.get('chepaihao'),'pzlb':values.get('cheliangleixing_id'),
                 'pzlb_str':values.get('cheliangleixing_str'),'chezhudh':values.get('dianhua'),
-                'fkfs':values.get('fukuanfangshi'),'tuijianren':values.get('tuijianren'),'data':{}}
+                'fkfs':values.get('fukuanfangshi'),'pingzhenghao':values.get('pingzhenghao'),
+                    'tuijianren':values.get('tuijianren'),'data':{}}
             if values.get('anjianshoufei_xiangmu') != None:
                 qitaxiangmu_list = [values.get('qita_xiangmu1'), values.get('qita_xiangmu2'),
                                 values.get('qita_xiangmu3'), values.get('qita_xiangmu4')]
@@ -1052,6 +1056,7 @@ class Window(QMainWindow,Ui_MainWindow):
             if values.get('qita_xiangmu4') != '--' and values.get('qita_xiangmu4') !=u'服务费':
                 qita_tijiao[values.get('qita_xiangmu4')]=values.get('qitajine_4')
             data['data']['qita'] = qita_tijiao
+            #print data
             self.tixingkuang.setText(u'请核对所有信息，是否提交？')
             self.tixingkuang.setStandardButtons(QMessageBox.Save |  QMessageBox.Cancel)
             self.tixingkuang.setDefaultButton(QMessageBox.Save)
