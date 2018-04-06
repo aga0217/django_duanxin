@@ -806,6 +806,7 @@ def webservice_shoufei(requset):#收费webserices
         fkfs = jieshou_json.get('fkfs')
         if fkfs is None:
             return JsonResponse({'chengong':False,'cuowu':u'没有找到付款方式'})
+        pingzhenghao = jieshou_json.get('pingzhenghao')
         fkfs_id = ''
         if fkfs == u'现金':
             fkfs_id='01'
@@ -841,7 +842,7 @@ def webservice_shoufei(requset):#收费webserices
 
         t={}
         if jczid == '01':
-            t = ShouFeiChuLi_1(jczid,cph,pzlb_id,pzlb_str,chezhudh,czry,czry_user,fkfs_id,fkfs,data)
+            t = ShouFeiChuLi_1(jczid,cph,pzlb_id,pzlb_str,chezhudh,czry,czry_user,fkfs_id,fkfs,data,pingzhenghao=pingzhenghao)
         if t.get('chenggong') == True:
             return JsonResponse({'chenggong':True,'data':True})
         elif t.get('chenggong') != True:
@@ -1456,7 +1457,7 @@ def MiMaYanZheng(str1):
         return True
 
 def ShouFeiChuLi_1(jczid,cph,pzlb_int,pzlb_str,chezhudh,czry,czry_user,fkfs_id,fkfs,data,is_tuikuan = False,bjr = None,
-                   bjr_username=None,tuikuan_riqi = None,tuikuanyuanyin = None):
+                   bjr_username=None,tuikuan_riqi = None,tuikuanyuanyin = None,pingzhenghao = None):
     for i in data:
         if i == 'anjian':#处理年检
             is_kefu = data.get(i).get('is_kefu')
@@ -1472,7 +1473,7 @@ def ShouFeiChuLi_1(jczid,cph,pzlb_int,pzlb_str,chezhudh,czry,czry_user,fkfs_id,f
                            skr_username=czry_user,skrq=datetime.datetime.now(),
                            skje=jfje,zhifufangshi_zimu=fkfs_id,zhifufangshi_str=fkfs,
                            is_kefu=is_kefu,is_tuikuan=is_tuikuan,bjr=bjr,bjr_username=bjr_username,tuikuan_riqi=tuikuan_riqi,
-                           tuikuan_shuoming=tuikuanyuanyin)
+                           tuikuan_shuoming=tuikuanyuanyin,pingzhenghao=pingzhenghao)
 
             q.save()
             if istellnumber(chezhudh):
@@ -1525,7 +1526,8 @@ def ShouFeiChuLi_1(jczid,cph,pzlb_int,pzlb_str,chezhudh,czry,czry_user,fkfs_id,f
                            jyxm='weiqi',jylb=jylb,dyid=weiqi_fanhui,skr=czry,
                            skr_username=czry_user,skrq=datetime.datetime.now(),
                            skje=jfje,zhifufangshi_zimu=fkfs_id,zhifufangshi_str=fkfs,is_tuikuan=is_tuikuan,
-                           bjr=bjr, bjr_username=bjr_username,tuikuan_riqi=tuikuan_riqi,tuikuan_shuoming=tuikuanyuanyin)
+                           bjr=bjr, bjr_username=bjr_username,tuikuan_riqi=tuikuan_riqi,
+                           tuikuan_shuoming=tuikuanyuanyin,pingzhenghao=pingzhenghao)
             q.save()
 
         if i == 'zongjian1':
@@ -1537,7 +1539,8 @@ def ShouFeiChuLi_1(jczid,cph,pzlb_int,pzlb_str,chezhudh,czry,czry_user,fkfs_id,f
                            jyxm='zongjian',jylb=jylb,zongjian_cheliangleixing=zongjian_cheliangleibie,
                            skr=czry,skr_username=czry_user,skrq=datetime.datetime.now(),
                            skje=jfje,zhifufangshi_zimu=fkfs_id,zhifufangshi_str=fkfs,is_tuikuan=is_tuikuan,
-                           bjr=bjr,bjr_username=bjr_username,tuikuan_riqi=tuikuan_riqi,tuikuan_shuoming=tuikuanyuanyin)
+                           bjr=bjr,bjr_username=bjr_username,tuikuan_riqi=tuikuan_riqi,
+                           tuikuan_shuoming=tuikuanyuanyin,pingzhenghao=pingzhenghao)
             q.save()
 
 
@@ -1550,7 +1553,8 @@ def ShouFeiChuLi_1(jczid,cph,pzlb_int,pzlb_str,chezhudh,czry,czry_user,fkfs_id,f
                            jyxm='zongjian',jylb=jylb,zongjian_cheliangleixing=zongjian_cheliangleibie,
                            skr=czry,skr_username=czry_user,skrq=datetime.datetime.now(),
                            skje=jfje,zhifufangshi_zimu=fkfs_id,zhifufangshi_str=fkfs,is_tuikuan=is_tuikuan,
-                           bjr=bjr,bjr_username=bjr_username,tuikuan_riqi=tuikuan_riqi,tuikuan_shuoming=tuikuanyuanyin)
+                           bjr=bjr,bjr_username=bjr_username,tuikuan_riqi=tuikuan_riqi,
+                           tuikuan_shuoming=tuikuanyuanyin,pingzhenghao=pingzhenghao)
             q.save()
 
         if i == 'zongjian':
@@ -1562,7 +1566,8 @@ def ShouFeiChuLi_1(jczid,cph,pzlb_int,pzlb_str,chezhudh,czry,czry_user,fkfs_id,f
                            jyxm='zongjian',jylb=jylb,zongjian_cheliangleixing=zongjian_cheliangleibie,
                            skr=czry,skr_username=czry_user,skrq=datetime.datetime.now(),
                            skje=jfje,zhifufangshi_zimu=fkfs_id,zhifufangshi_str=fkfs,is_tuikuan=is_tuikuan,
-                           bjr=bjr,bjr_username=bjr_username,tuikuan_riqi=tuikuan_riqi,tuikuan_shuoming=tuikuanyuanyin)
+                           bjr=bjr,bjr_username=bjr_username,tuikuan_riqi=tuikuan_riqi,
+                           tuikuan_shuoming=tuikuanyuanyin,pingzhenghao=pingzhenghao)
             q.save()
 
         if i == 'qita':
@@ -1582,7 +1587,8 @@ def ShouFeiChuLi_1(jczid,cph,pzlb_int,pzlb_str,chezhudh,czry,czry_user,fkfs_id,f
                            jyxm='qita',jylb=jylb,dyid=qita_fanhui,skr=czry,
                            skr_username=czry_user,skrq=datetime.datetime.now(),
                            skje=jfje,zhifufangshi_zimu=fkfs_id,zhifufangshi_str=fkfs,is_tuikuan=is_tuikuan,
-                               bjr=bjr, bjr_username=bjr_username,tuikuan_riqi=tuikuan_riqi,tuikuan_shuoming=tuikuanyuanyin)
+                               bjr=bjr, bjr_username=bjr_username,tuikuan_riqi=tuikuan_riqi,
+                                   tuikuan_shuoming=tuikuanyuanyin,pingzhenghao=pingzhenghao)
                     q.save()
             else:
                 qita_fanhui = anjianshujucharu_1_qita(cph, pzlb_int, pzlb_str, czry, jylb, jfje)
@@ -1592,7 +1598,7 @@ def ShouFeiChuLi_1(jczid,cph,pzlb_int,pzlb_str,chezhudh,czry,czry_user,fkfs_id,f
                            skr_username=czry_user, skrq=datetime.datetime.now(),
                            skje=jfje, zhifufangshi_zimu=fkfs_id, zhifufangshi_str=fkfs, is_tuikuan=is_tuikuan,
                            bjr=bjr, bjr_username=bjr_username, tuikuan_riqi=tuikuan_riqi,
-                           tuikuan_shuoming=tuikuanyuanyin)
+                           tuikuan_shuoming=tuikuanyuanyin,pingzhenghao=pingzhenghao)
                 q.save()
 
 
