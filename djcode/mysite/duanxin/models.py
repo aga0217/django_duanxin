@@ -530,7 +530,7 @@ class DX_ShouFei_Config_ChePaiQian(models.Model):
     count = models.IntegerField(null=True,verbose_name=u'省份简称出现的次数')#为今后的动态排序提供基础
     def getchepaiqian(self):
         chepaiqian = []
-        qs = DX_ShouFei_Config_ChePaiQian.objects.filter(isuse=True).order_by('id').values_list('chepaiqian')
+        qs = DX_ShouFei_Config_ChePaiQian.objects.filter(isuse=True).order_by('-count').values_list('chepaiqian')
         for i in qs:
             chepaiqian.append(i[0])
         return chepaiqian
