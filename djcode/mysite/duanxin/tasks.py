@@ -3,6 +3,8 @@
 
 from __future__ import absolute_import, unicode_literals
 from celery import shared_task
+import time
+import celery.exceptions
 import subprocess
 from .models import *
 import datetime
@@ -10,6 +12,7 @@ from .jiami_jiemi_test import AESCipher
 import psycopg2
 import sys
 import requests
+requests.packages.urllib3.disable_warnings()
 LOGID = 0
 @shared_task
 def add(x, y):
@@ -77,9 +80,13 @@ class SendSMSClass(object):
 
     def send(self):
         self.starttime()
+        n = 0
         qs = self.query()
-        if qs[7] == 'yewu_kaishi':
-            resp = requests.post(("http://api.weimi.cc/2/sms/send.html"),
+        while n <100:
+            if qs[7] == 'yewu_kaishi':
+
+                try:
+                    resp = requests.post(("http://api.weimi.cc/2/sms/send.html"),
                                  data={
                                      "uid": "ipScrzAANE33",
                                      "pas": "jc5fv2nc",
@@ -87,16 +94,25 @@ class SendSMSClass(object):
                                      "cid": "nEFFQCJiIImA",
                                      "type": "json",
                                      "p1": qs[1]
-                                 }, timeout=3, verify=False)
-            result = json.loads(resp.content)
-            fasongneirong = u'【鑫运检测】尊敬的%s车主您好，欢迎来到我站办理检测业务' % qs[1]
-            dic = {'id': qs[0], 'fanhuizhi': result.get('code'), 'fanhuixinxi': result.get('msg'),
+                                 }, timeout=20, verify=False)
+                except:
+                    n = n+1
+                    time.sleep(20)
+                    print 'chongshi'
+                    continue
+
+                result = json.loads(resp.content)
+
+                fasongneirong = u'【鑫运检测】尊敬的%s车主您好，欢迎来到我站办理检测业务' % qs[1]
+                dic = {'id': qs[0], 'fanhuizhi': result.get('code'), 'fanhuixinxi': result.get('msg'),
                               'tijiao_neirong': fasongneirong, 'gongyingshang': u'微米'}
-            self.updatefasongmx(dic)
-            self.updatecelerylog('yewu_kaishi sussessful')
-            self.close()
-        elif qs[7] == 'yewu_banjie':
-            resp = requests.post(("http://api.weimi.cc/2/sms/send.html"),
+                self.updatefasongmx(dic)
+                self.updatecelerylog(str(dic))
+                self.close()
+                break
+            elif qs[7] == 'yewu_banjie':
+                try:
+                    resp = requests.post(("http://api.weimi.cc/2/sms/send.html"),
                                  data={
                                      "uid": "ipScrzAANE33",
                                      "pas": "jc5fv2nc",
@@ -104,16 +120,24 @@ class SendSMSClass(object):
                                      "cid": "AW1EpStGp2cnull",
                                      "type": "json",
                                      "p1": qs[1]
-                                 }, timeout=3, verify=False)
-            result = json.loads(resp.content)
-            fasongneirong = u'【鑫运检测】尊敬的%s车主您好，您的检测业务已办结' % qs[1]
-            dic = {'id': qs[0], 'fanhuizhi': result.get('code'), 'fanhuixinxi': result.get('msg'),
+                                 }, timeout=20, verify=False)
+                except:
+                    n = n+1
+                    time.sleep(20)
+                    print 'chongshi'
+                    continue
+                result = json.loads(resp.content)
+
+                fasongneirong = u'【鑫运检测】尊敬的%s车主您好，您的检测业务已办结' % qs[1]
+                dic = {'id': qs[0], 'fanhuizhi': result.get('code'), 'fanhuixinxi': result.get('msg'),
                               'tijiao_neirong': fasongneirong, 'gongyingshang': u'微米'}
-            self.updatefasongmx(dic)
-            self.updatecelerylog('yewu_banjie sussessful')
-            self.close()
-        elif qs[7] == 'tixing_tjr':
-            resp = requests.post(("http://api.weimi.cc/2/sms/send.html"),
+                self.updatefasongmx(dic)
+                self.updatecelerylog(str(dic))
+                self.close()
+                break
+            elif qs[7] == 'tixing_tjr':
+                try:
+                    resp = requests.post(("http://api.weimi.cc/2/sms/send.html"),
                                  data={
                                      "uid": "ipScrzAANE33",
                                      "pas": "jc5fv2nc",
@@ -122,14 +146,21 @@ class SendSMSClass(object):
                                      "type": "json",
                                      "p1": qs[1],
                                      "p2": str(qs[16])
-                                 }, timeout=3, verify=False)
-            result = json.loads(resp.content)
-            fasongneirong = u'【鑫运检测】%s已经登记，本月您已推荐%s台车辆。请核实。' % (qs[1], str(qs[16]))
-            dic = {'id': qs[0], 'fanhuizhi': result.get('code'), 'fanhuixinxi': result.get('msg'),
+                                 }, timeout=20, verify=False)
+                except :
+                    n = n+1
+                    time.sleep(20)
+                    print 'chongshi'
+                    continue
+                result = json.loads(resp.content)
+
+                fasongneirong = u'【鑫运检测】%s已经登记，本月您已推荐%s台车辆。请核实。' % (qs[1], str(qs[16]))
+                dic = {'id': qs[0], 'fanhuizhi': result.get('code'), 'fanhuixinxi': result.get('msg'),
                               'tijiao_neirong': fasongneirong, 'gongyingshang': u'微米'}
-            self.updatefasongmx(dic)
-            self.updatecelerylog('tixing_tjr sussessful')
-            self.close()
+                self.updatefasongmx(dic)
+                self.updatecelerylog(str(dic))
+                self.close()
+                break
 
     def updatefasongmx(self,dic):
         sql = "UPDATE duanxin_dx_fasongmx set is_fasong=TRUE,fasong_datetime=now(),fanhuizhi=%s,tijiao_neirong=%s,fanhuixinxi=%s,gongyingshang=%s where ID=%s"
@@ -150,7 +181,7 @@ class SendSMSClass(object):
     def close(self):
         self.cur.close()
         self.conn.close()
-@shared_task
+@shared_task(default_retry_delay = 1 * 60, max_retries = 10)
 def sendsms(id):
     SendSMSClass(id).send()
 
