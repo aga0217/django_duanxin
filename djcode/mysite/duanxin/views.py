@@ -13,6 +13,7 @@ from braces.views import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib.auth import logout
 import datetime
 import random
+import string
 import imghdr
 import os
 from django.conf import settings
@@ -53,7 +54,8 @@ import requests
 from xpinyin import Pinyin
 from jiami_jiemi_test import AESCipher
 from tasks import sendsms
-ip_yunxu = ['192.168.0.1','15.29.32.56','15.29.32.55','15.29.32.49','192.168.0.2','15.29.32.61','15.29.32.78']
+ip_yunxu = ['192.168.0.1','15.29.32.56','15.29.32.55','15.29.32.49','192.168.0.2','15.29.32.61','15.29.32.78',
+            '15.29.32.63']
 def tijiao(request):
 	#global jiaxiaoidglobal
 	#jiaxiaoid = int(jiaxiaoid)
@@ -678,7 +680,6 @@ def jieguo_to_excel(jieguo_df,chaxun_or_duibi):
         writer.save()
     return path_return
 
-#TODO:收费查询功能需要移至shoufei monels中实现
 def webservice_weiqishofuei_chaxun(requset):
     if requset.method == 'POST':
         try:
@@ -1386,9 +1387,137 @@ def PrintBill(requset,id):#单独打印票据
     skje = qs.skje
     jylb = qs.jylb
     skr = qs.skr
-
-
     return render_to_response('dandudyin.html', locals(), context_instance=RequestContext(requset))
+
+def creatstr(key_len):
+    keylist = [random.choice(string.letters+string.digits) for i in range(key_len)]
+    return ("".join(keylist))
+
+def PritBills(requset,idlsstr):
+    anjianlist = []
+    weiqilist = []
+    qitalist = []
+    idlist = idlsstr.split('-')
+    for i in idlist:
+        try:
+            qs = DX_ShouFei.objects.get(id = int(i))
+        except:
+            continue
+        if qs.is_tuikuan:
+            continue
+        if qs.jyxm == 'anjian':
+            anjianlist.append({'cph':qs.paizhaohao,
+                                 'cheliangleibie_str':qs.cheliangleibie_str,
+                                 'skrq':qs.skrq,
+                                 'skr':qs.skr,
+                                 'skje':qs.skje,
+                                 'jylb':qs.jylb,
+                               'id': qs.id})
+        elif qs.jyxm == 'weiqi':
+            weiqilist.append({'cph':qs.paizhaohao,
+                                 'cheliangleibie_str':qs.cheliangleibie_str,
+                                 'skrq':qs.skrq,
+                                 'skr':qs.skr,
+                                 'skje':qs.skje,
+                                 'jylb':qs.jylb,
+                              'id':qs.id})
+        elif qs.jyxm == 'qita':
+            qitalist.append({'cph':qs.paizhaohao,
+                                 'cheliangleibie_str':qs.cheliangleibie_str,
+                                 'skrq':qs.skrq,
+                                 'skr':qs.skr,
+                                 'skje':qs.skje,
+                                 'jylb':qs.jylb,
+                             'id':qs.id})
+    if len(anjianlist) != 1 or len(weiqilist) != 1 or len(qitalist) !=1:
+        return HttpResponse ('lie biao chang du bu zheng que，anjianlist:%s,weiqilist:%s,qitalist:%s' % (str(anjianlist),str(weiqilist),str(qitalist)))
+    anjian = (anjianlist[0].get('cph'),
+              anjianlist[0].get('cheliangleibie_str'),
+              str(anjianlist[0].get('skrq'))[:10],
+              anjianlist[0].get('skr'))
+    weiqi = (weiqilist[0].get('cph'),
+             weiqilist[0].get('cheliangleibie_str'),
+             str(weiqilist[0].get('skrq'))[:10],
+             weiqilist[0].get('skr'))
+    qita = (qitalist[0].get('cph'),
+            qitalist[0].get('cheliangleibie_str'),
+            str(qitalist[0].get('skrq'))[:10],
+            qitalist[0].get('skr'))
+    if not anjian == weiqi == qita:
+        return HttpResponse('yuan zu jiao yuan bu tong guo anjian:%s,weiqi:%s,qita:%s' % (str(anjian),str(weiqi),str(qita)))
+    jiancefphm = creatstr(10)
+    cph = anjian[0]
+    skrq = anjian[2]
+    cheliangleibie_str = anjian[1]
+    jianceskje = anjianlist[0].get('skje') + weiqilist[0].get('skje')
+    jiancejylb = anjianlist[0].get('jylb') + '+' + weiqilist[0].get('jylb')
+    skr = anjianlist[0].get('skr')
+    fuwufphm = creatstr(10)
+    fuwujylb = qitalist[0].get('jylb')
+    fuwuskje = qitalist[0].get('skje')
+    jianceid = [anjianlist[0].get('id'),weiqilist[0].get('id')]
+    fuwuid = [qitalist[0].get('id')]
+    for i in jianceid:
+        qs1 = DX_ShouFei.objects.filter(id = i)
+        qs1.update(fphmid=jiancefphm)
+    for i in fuwuid:
+        qs2 = DX_ShouFei.objects.filter(id = i)
+        qs2.update(fphmid = fuwufphm)
+    return render_to_response('duoxiangdayin.html',locals(), context_instance=RequestContext(requset))
+
+def PritBills_2(requset,idlsstr):
+    anjianlist = []
+    weiqilist = []
+    idlist = idlsstr.split('-')
+    for i in idlist:
+        try:
+            qs = DX_ShouFei.objects.get(id = int(i))
+        except:
+            continue
+        if qs.is_tuikuan:
+            continue
+        if qs.jyxm == 'anjian':
+            anjianlist.append({'cph':qs.paizhaohao,
+                                 'cheliangleibie_str':qs.cheliangleibie_str,
+                                 'skrq':qs.skrq,
+                                 'skr':qs.skr,
+                                 'skje':qs.skje,
+                                 'jylb':qs.jylb,
+                               'id': qs.id})
+        elif qs.jyxm == 'weiqi':
+            weiqilist.append({'cph':qs.paizhaohao,
+                                 'cheliangleibie_str':qs.cheliangleibie_str,
+                                 'skrq':qs.skrq,
+                                 'skr':qs.skr,
+                                 'skje':qs.skje,
+                                 'jylb':qs.jylb,
+                              'id':qs.id})
+    if len(anjianlist) != 1 or len(weiqilist) != 1:
+        return HttpResponse ('lie biao chang du bu zheng que，anjianlist:%s,weiqilist:%s,qitalist:%s' % (str(anjianlist),str(weiqilist),str(qitalist)))
+    anjian = (anjianlist[0].get('cph'),
+              anjianlist[0].get('cheliangleibie_str'),
+              str(anjianlist[0].get('skrq'))[:10],
+              anjianlist[0].get('skr'))
+    weiqi = (weiqilist[0].get('cph'),
+             weiqilist[0].get('cheliangleibie_str'),
+             str(weiqilist[0].get('skrq'))[:10],
+             weiqilist[0].get('skr'))
+
+    if not anjian == weiqi:
+        return HttpResponse('yuan zu jiao yuan bu tong guo anjian:%s,weiqi:%s' % (str(anjian),str(weiqi)))
+    jiancefphm = creatstr(10)
+    cph = anjian[0]
+    skrq = anjian[2]
+    cheliangleibie_str = anjian[1]
+    jianceskje = anjianlist[0].get('skje') + weiqilist[0].get('skje')
+    jiancejylb = anjianlist[0].get('jylb') + '+' + weiqilist[0].get('jylb')
+    skr = anjianlist[0].get('skr')
+    fuwufphm = creatstr(10)
+    jianceid = [anjianlist[0].get('id'),weiqilist[0].get('id')]
+    for i in jianceid:
+        qs1 = DX_ShouFei.objects.filter(id = i)
+        qs1.update(fphmid=jiancefphm)
+    return render_to_response('duoxiangdayin_2.html',locals(), context_instance=RequestContext(requset))
 
 def ShouFeiDengLu(requset):
     if requset.method == 'POST':
@@ -1514,12 +1643,12 @@ def ShouFeiChuLi_1(jczid,cph,pzlb_int,pzlb_str,chezhudh,czry,czry_user,fkfs_id,f
             jylb = data.get(i).get('jylb')
             jfje = data.get(i).get('jfje')
             is_zhuanru = data.get(i).get('is_zhuanru')
-            if pzlb_int == '16':
-                cph = cph + u'学'
-            elif pzlb_int == '23':
-                cph = cph + u'警'
-            if is_zhuanru == True:
-                cph = u'转' + cph
+            #if pzlb_int == '16':
+                #cph = cph + u'学'
+            #elif pzlb_int == '23':
+                #cph = cph + u'警'
+            #if is_zhuanru == True:
+                #cph = u'转' + cph
             weiqi_fanhui = weiqishujucharu_1(cph,pzlb_int,pzlb_str,czry,jylb,jfje,is_zhuanru=False)
             q = DX_ShouFei(jczid=jczid,paizhaohao=cph,cheliangleibie_id=pzlb_int,
                            cheliangleibie_str=pzlb_str,chezhudianhua=chezhudh,
@@ -2014,7 +2143,50 @@ def weiqi_readshoufei(requset):
                 return JsonResponse({'chenggong':False})
         else:
             return JsonResponse({'denglu':False,'cuowu':yanzheng.get('cuowu')})
-#TODO:增加返回配置的功能
+
+def weiqi_readshoufei_new(requset):
+    if requset.method == 'POST':
+        #验证IP地址
+        try:
+            ip =requset.META['REMOTE_ADDR']
+        except:
+            return JsonResponse({'dengliu':False,'cuowu':u'访问地址不匹配01'})
+
+        if ip not in ip_yunxu:
+            return JsonResponse({'denglu':False,'cuowu':u'%s访问地址不匹配02' % ip})
+        #处理json
+        try:
+            jieshou_json = json.loads(requset.body)
+        except ValueError:
+            return JsonResponse({'denglu':False,'cuowu':u'数据格式不对'})
+        tongbu_username = jieshou_json['tongbu_username']
+        tongbu_password = jieshou_json['password']
+        yanzheng = DX_ShouFei_UserName().UserDengLu(tongbu_username,tongbu_password)
+        if yanzheng.get('denglu') == True:
+            today = datetime.date.today()
+            startday = today - datetime.timedelta(days=30)
+            endday = today + datetime.timedelta(days=1)
+            qs_list = DX_ShouFei().getweiqitongbushoufei(startday,endday)
+            if qs_list:
+                cphdic = {}
+                for i in qs_list:
+                    cph,chepai_leibie,jfje,is_tuikuan,jkrq,cheliangleibie_str = i
+                    if is_tuikuan:#如果最后一笔的退款状态为已退款，则重新查询退款状态
+                        is_tuikuan = DX_ShouFei().decrefund(startday,endday,cph,chepai_leibie)
+                    #getchp = weiqi_cphzhuanhuan(cph,chepai_leibie)
+                    jkrqstr = str(jkrq)[:19]
+                    cphtemp = cph + '-'+chepai_leibie
+                    cphdic[cphtemp] = {'jfje':jfje,
+                                      'is_tuikuan':is_tuikuan,
+                                      'jkrq':jkrqstr,
+                                      'cheliangleibie_id':chepai_leibie,
+                                      'cheliangleibie_str':cheliangleibie_str}
+                return JsonResponse({'chenggong':True,'data':cphdic})
+            else:
+                return JsonResponse({'chenggong':False})
+        else:
+            return JsonResponse({'denglu':False,'cuowu':yanzheng.get('cuowu')})
+
 def getshoufeiconfig(requset):
     if requset.method == 'POST':
         #验证IP地址
@@ -2162,6 +2334,81 @@ class weiqi_zhuangtaichaxun:#尾气状态查询
         return jieguo
 
 
+def readshoufeidetail(requset):
+    if requset.method == 'POST':
+        # 验证IP地址
+        try:
+            ip = requset.META['REMOTE_ADDR']
+        except:
+            return JsonResponse({'chenggong': False, 'cuowu': u'IP地址不匹配'})
+        if ip not in ip_yunxu:
+            return JsonResponse({'chenggong': False, 'cuowu': u'%s访问地址不匹配02' % ip})
+        # 处理json
+        try:
+            jieshou_json = json.loads(requset.body)
+        except ValueError:
+            return JsonResponse({'chenggong': False, 'cuowu': u'数据格式不对'})
+        jczid = jieshou_json.get('jczid')
+        if jczid is None:
+            return JsonResponse({'chenggong': False, 'cuowu': u'没有找到检测站编号'})
+        id = jieshou_json.get('id')
+        if not id:
+            return JsonResponse({'chenggong':False,'cuowu':u'没有找到id'})
+        qs = list(DX_ShouFei.objects.filter(jczid=jczid,id=id).values('paizhaohao','cheliangleibie_str','chezhudianhua',
+                                                                      'jylb','skr','skrq','zhifufangshi_str',
+                                                                      'pingzhenghao','jiezhangriqi','is_kefu','is_zhuanru',
+                                                                      'fapiao_qiri','tuikuan_riqi','tuikuan_shuoming'))
+        if not qs:
+                return JsonResponse({'chenggong': True, 'data': {'qs': None}})
+        return JsonResponse({'chenggong': True, 'data': {'qs': qs}})
+
+def autojylshcarinfosave(requset):
+    if requset.method == 'POST':
+        try:
+            jieshou_json = json.loads(requset.body)
+        except:
+            return JsonResponse({'chenggong': False,'cuowu':u'数据格式不正确'})
+        else:
+            hphm = jieshou_json.get('hphm')
+            hpzl = jieshou_json.get('hpzl')
+            clsbdh = jieshou_json.get('clsbdh')
+            user = jieshou_json.get('user')
+        if hphm and hpzl and clsbdh and user:
+            if Dx_AutoLSH().savecarinfo(hphm,hpzl,clsbdh,user):
+                return JsonResponse({'chenggong': True})
+            else:
+                return JsonResponse({'chenggong':False,'cuowu':u'车辆车辆保存失败'})
+        else:
+            return JsonResponse({'chenggong':False,'cuowu':u'缺少数据内容'})
+    else:
+        return HttpResponseNotFound
+
+def getautojylshcarinfolist(requset):
+    if requset.method == 'POST':
+        qs = Dx_AutoLSH().getlist()
+        if qs:
+            return JsonResponse({'chenggong':True,'data':qs})
+        else:
+            return JsonResponse({'chenggong':True,'data':None})
+    else:
+        return HttpResponseNotFound
+
+def updateautojylshcarinfolist(requset):
+    if requset.method == 'POST':
+        try:
+            jieshou_json = json.loads(requset.body)
+        except:
+            return JsonResponse({'chenggong': False,'cuowu':u'数据格式不正确'})
+        else:
+            id = jieshou_json.get('id')
+            data = jieshou_json.get('data')
+            result = Dx_AutoLSH().updatezhuangtai(id,data)
+            if result['chenggong']:
+                return JsonResponse({'chenggong':True})
+            else:
+                return JsonResponse({'chenggong':False,'cuowu':result['cuowu']})
+    else:
+        return HttpResponseNotFound
 """
 部署到0。3其他机器需注释掉
 

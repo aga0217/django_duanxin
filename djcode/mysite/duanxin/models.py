@@ -127,6 +127,7 @@ class DX_ShouFei(models.Model):
     tuikuan_shuoming = models.CharField(max_length=256,verbose_name=u'退款说明',null=True)
     is_weiqitongbu = models.BooleanField(default=False,verbose_name=u'是否被尾气同步程序读取过')
     zongjian_cheliangleixing = models.CharField(max_length=256,verbose_name=u'综检车辆类型',null=True)#综检对应车辆类型客车、货车、出租车
+    fphmid = models.CharField(max_length=24,verbose_name=u'打印号码',null=True)
 
     def tuikuan(self,user,pws,id):
         yanzheng = DX_ShouFei_UserName().UserDengLu(user,pws)
@@ -619,6 +620,7 @@ class DX_ShouFei_Config_CheLiangLeiXingToInt(models.Model):
         for i in qs:
             dic1[i.cheliangleixing] = i.leixingint
         return dic1
+
 class SendSMS(object):
     help = u'使用异步方式发送短信以取代定时发送机制'
     aes_cipher = AESCipher()
@@ -693,9 +695,63 @@ class SendSMS(object):
             a = DX_CeleryLog.objects.filter(id=starttime_id)
             a.update(result='success',endtime=datetime.datetime.now())
         else:
-            a = DX_CeleryLog.objcets.filter(id=starttime_id)
+            a = DX_CeleryLog.objects.filter(id=starttime_id)
             a.update(result='failure',endtime=datetime.datetime.now())
 
+class Dx_AutoLSH(models.Model):
+    hphm = models.CharField(max_length=20,verbose_name=u'车牌号码')
+    hpzl = models.CharField(max_length=2,verbose_name=u'号牌种类id')
+    hpzlstr = models.CharField(max_length=50,verbose_name=u'号牌种类str')
+    clsbdh = models.CharField(max_length=4,verbose_name=u'车辆识别代码')#只保存后四位
+    chulizhuangtai = models.CharField(max_length=1024,verbose_name=u'处理状态',null=True)#18Z49,18C49,18C51
+    jylsh = models.CharField(max_length=20,verbose_name=u'检验流水号',null=True)#已经存在的流水号和获得的流水号
+    clzt = models.CharField(max_length=20,verbose_name=u'车辆状态',null=True)#车辆状态，锁定，注销
+    chulijieguo = models.CharField(max_length=2048,verbose_name=u'处理结果',null=True)#处理结果
+    isdelete = models.BooleanField(default=False)#是否被删除
+    chulizhuangtaifh = models.CharField(max_length=2048,verbose_name=u'处理返回的结果',null=True)
+    creattime = models.DateTimeField(verbose_name=u'创建时间')#车辆信息录入时间
+    user = models.CharField(max_length=20,verbose_name=u'录入人员')#录入人员
+
+    def savecarinfo(self,hphm,hpzl,clsbdh,user):#保存车辆信息
+        dic = {'02': u'小型汽车', '01': u'大型汽车', '03': u'使馆汽车', '04': u'领馆汽车', '05': u'境外汽车',
+               '15': u'挂车', '13': u'农用运输车', '14': u'拖拉机', '17': u'教练摩托车', '23': u'警用汽车',
+               '07': u'两、三轮摩托', '06': u'外籍汽车', '08': u'轻便摩托车', '16': u'教练汽车', '24': u'警用摩托车'}
+        if self.cansave(hphm,hpzl,clsbdh):
+            q = Dx_AutoLSH(hphm=hphm,hpzl=hpzl,clsbdh=clsbdh,hpzlstr=dic.get(hpzl),creattime=datetime.datetime.now(),
+                                   user=user)
+            q.save()
+            return True
+        else:
+            return False
+
+
+    def cansave(self,hphm,hpzl,clsbdh):#判断是否存在重复录入（1小时内由手动录入和收费录入引起的重复）
+        qs = Dx_AutoLSH.objects.filter(hphm=hphm,hpzl=hpzl,clsbdh=clsbdh,isdelete=False).order_by('-id')
+        if qs:
+            creattime = qs[0].creattime
+            shijiancha = datetime.datetime.now() - creattime
+            if shijiancha < datetime.timedelta(hours=1):
+                return False
+            else:
+                return True
+        else:
+            return True
+
+    def getlist(self):#获取流水号列表，只获取当天的列表
+        year,month,day = (int(x) for x in str(datetime.date.today()).split('-'))
+        qs = Dx_AutoLSH.objects.filter(creattime__year=year,
+                                       creattime__month=month,
+                                       creattime__day=day,
+                                       isdelete=False).order_by('-id')
+        return str(qs.values())
+
+    def updatezhuangtai(self,id,dic):
+        qs = Dx_AutoLSH.objects.filter(id=id)
+        if qs:
+            qs.update(**dic)
+            return {'chenggong':True}
+        else:
+            return {'chenggong':False,'cunwu':u'没有找到对应id'}
 
 
 
