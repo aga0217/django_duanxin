@@ -711,19 +711,21 @@ class Dx_AutoLSH(models.Model):
     chulizhuangtaifh = models.CharField(max_length=2048,verbose_name=u'处理返回的结果',null=True)
     creattime = models.DateTimeField(verbose_name=u'创建时间')#车辆信息录入时间
     user = models.CharField(max_length=20,verbose_name=u'录入人员')#录入人员
+    xml18c49 = models.CharField(max_length=4096,verbose_name=u'18c49返回信息',null=True)#18c49返回信息，当18c49执行成功时存入
+    dizhi = models.CharField(max_length=16,verbose_name=u'使用udp添加任务时发送设备的IP地址',null = True)#使用udp添加任务时发送设备的IP地址
 
-    def savecarinfo(self,hphm,hpzl,clsbdh,user):#保存车辆信息
+    def savecarinfo(self,hphm,hpzl,clsbdh,user,dizhi=None):#保存车辆信息
         dic = {'02': u'小型汽车', '01': u'大型汽车', '03': u'使馆汽车', '04': u'领馆汽车', '05': u'境外汽车',
                '15': u'挂车', '13': u'农用运输车', '14': u'拖拉机', '17': u'教练摩托车', '23': u'警用汽车',
-               '07': u'两、三轮摩托', '06': u'外籍汽车', '08': u'轻便摩托车', '16': u'教练汽车', '24': u'警用摩托车'}
+               '07': u'两、三轮摩托', '06': u'外籍汽车', '08': u'轻便摩托车', '16': u'教练汽车', '24': u'警用摩托车',
+               '51':u'大型新能源汽车','52':u'小型新能源汽车'}
         if self.cansave(hphm,hpzl,clsbdh):
             q = Dx_AutoLSH(hphm=hphm,hpzl=hpzl,clsbdh=clsbdh,hpzlstr=dic.get(hpzl),creattime=datetime.datetime.now(),
-                                   user=user)
+                                   user=user,dizhi=dizhi)
             q.save()
             return True
         else:
             return False
-
 
     def cansave(self,hphm,hpzl,clsbdh):#判断是否存在重复录入（1小时内由手动录入和收费录入引起的重复）
         qs = Dx_AutoLSH.objects.filter(hphm=hphm,hpzl=hpzl,clsbdh=clsbdh,isdelete=False).order_by('-id')
@@ -743,7 +745,19 @@ class Dx_AutoLSH(models.Model):
                                        creattime__month=month,
                                        creattime__day=day,
                                        isdelete=False).order_by('-id')
-        return str(qs.values())
+        return list(qs.values('id',
+                              'hphm',
+                              'hpzl',
+                              'hpzlstr',
+                              'clsbdh',
+                              'chulizhuangtai',
+                              'jylsh',
+                              'clzt',
+                              'chulijieguo',
+                              'isdelete',
+                              'creattime',
+                              'user',
+                              'dizhi'))
 
     def updatezhuangtai(self,id,dic):
         qs = Dx_AutoLSH.objects.filter(id=id)
@@ -752,6 +766,34 @@ class Dx_AutoLSH(models.Model):
             return {'chenggong':True}
         else:
             return {'chenggong':False,'cunwu':u'没有找到对应id'}
+
+
+class Dx_CarImg(models.Model):
+    hphm = models.CharField(max_length=10, verbose_name=u'车牌号码')
+    hpzl = models.CharField(max_length=2, verbose_name=u'号牌种类id')
+    imgstr = models.TextField(verbose_name=u'图片字符串')
+
+    def saveorupdate(self,hphm,hpzl,imgstr):#判断传入的数据是否需要保存还是更新
+        try:
+            qs = Dx_CarImg.objects.get(hphm=hphm,hpzl=hpzl)
+        except:
+            q = Dx_CarImg(hphm=hphm,hpzl=hpzl,imgstr=imgstr)#不存在则增加
+            q.save()
+            return {'caozuo':'save'}
+        else:
+            id = qs.id
+            qu = Dx_CarImg.objects.filter(id=id)
+            qu.update(imgstr=imgstr)
+            return {'caozuo':'update'}
+
+    def getimg(self,hphm,hpzl):
+        try:
+            qs = Dx_CarImg.objects.get(hphm=hphm,hpzl=hpzl)
+        except:
+            return {'chenggong':False,'cuowu':u'没有车辆图片'}
+        else:
+            return {'chenggong':True,'data':qs.imgstr}
+
 
 
 

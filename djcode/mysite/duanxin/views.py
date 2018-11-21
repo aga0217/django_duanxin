@@ -53,9 +53,10 @@ import pyodbc
 import requests
 from xpinyin import Pinyin
 from jiami_jiemi_test import AESCipher
-from tasks import sendsms
+from tasks import sendsms,delcarinfo
 ip_yunxu = ['192.168.0.1','15.29.32.56','15.29.32.55','15.29.32.49','192.168.0.2','15.29.32.61','15.29.32.78',
-            '15.29.32.63']
+            '15.29.32.63','15.29.32.64','15.29.32.65','15.29.32.66','15.29.32.67','15.29.32.68','15.29.32.69',
+            '15.29.32.70','15.29.32.71','15.29.32.72','15.29.32.59','15.29.32.86']
 def tijiao(request):
 	#global jiaxiaoidglobal
 	#jiaxiaoid = int(jiaxiaoid)
@@ -2373,8 +2374,9 @@ def autojylshcarinfosave(requset):
             hpzl = jieshou_json.get('hpzl')
             clsbdh = jieshou_json.get('clsbdh')
             user = jieshou_json.get('user')
+            dizhi = jieshou_json.get('dizhi')
         if hphm and hpzl and clsbdh and user:
-            if Dx_AutoLSH().savecarinfo(hphm,hpzl,clsbdh,user):
+            if Dx_AutoLSH().savecarinfo(hphm,hpzl,clsbdh,user,dizhi):
                 return JsonResponse({'chenggong': True})
             else:
                 return JsonResponse({'chenggong':False,'cuowu':u'车辆车辆保存失败'})
@@ -2402,6 +2404,8 @@ def updateautojylshcarinfolist(requset):
         else:
             id = jieshou_json.get('id')
             data = jieshou_json.get('data')
+            if data.get('chulizhuangtai') == '18C51' and data.get('chulijieguo') == u'处理完成':
+                delcarinfo.delay(id)
             result = Dx_AutoLSH().updatezhuangtai(id,data)
             if result['chenggong']:
                 return JsonResponse({'chenggong':True})
@@ -2409,6 +2413,63 @@ def updateautojylshcarinfolist(requset):
                 return JsonResponse({'chenggong':False,'cuowu':result['cuowu']})
     else:
         return HttpResponseNotFound
+
+def getcarinfobyid(request,id):#通过ID查找车辆信息返回给收费客户端
+    qs = Dx_AutoLSH.objects.filter(id = id)
+    if not qs:
+        return JsonResponse({'chenggong': False, 'cuowu': u'没有找到对应的id'})
+    else:
+        data = list(qs.values('id',
+                       'hphm',
+                       'hpzl',
+                       'hpzlstr',
+                       'clsbdh',
+                       'chulizhuangtai',
+                       'jylsh',
+                       'clzt',
+                       'chulijieguo',
+                       'isdelete',
+                       'creattime',
+                       'user',
+                       'dizhi'))
+        return JsonResponse({'chenggong': True, 'data': data})
+
+def savecarimg(request):
+    if request.method == 'POST':
+        try:
+            jieshou_json = json.loads(request.body)
+        except:
+            return JsonResponse({'chenggong': False,'cuowu':u'数据格式不正确'})
+        else:
+            hphm = jieshou_json.get('hphm')
+            hpzl = jieshou_json.get('hpzl')
+            imgstr = jieshou_json.get('imgstr')
+            if hphm and hpzl and imgstr:
+                return JsonResponse({'data':Dx_CarImg().saveorupdate(hphm,hpzl,imgstr).get('caozuo'),
+                                     'chenggong':True})
+            else:
+                return JsonResponse({'chenggong':False,'cuowu':u'数据字段值非法'})
+
+def getcarimg(request):
+    if request.method == 'POST':
+        try:
+            jieshou_json = json.loads(request.body)
+        except:
+            return JsonResponse({'chenggong': False,'cuowu':u'数据格式不正确'})
+        else:
+            hphm = jieshou_json.get('hphm')
+            hpzl = jieshou_json.get('hpzl')
+            if hphm and hpzl:
+                img = Dx_CarImg().getimg(hphm,hpzl)
+                if img.get('chenggong'):
+                    return JsonResponse({'chenggong':True,'data':img.get('data')})
+                else:
+                    return JsonResponse({'chenggong':False,'cuowu':img.get('cuowu')})
+            else:
+                return JsonResponse({'chenggong':False,'cuowu':u'数据值非法'})
+
+
+
 """
 部署到0。3其他机器需注释掉
 
