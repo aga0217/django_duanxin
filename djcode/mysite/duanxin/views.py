@@ -321,8 +321,8 @@ def webservice_weiqi_chaxun(requset):
                 datetime_str = ''.join(datetime_list)
                 result['DJDate'] = datetime_str
                 result['CLLBXID'] = i.get('CLLBXID')
-                
-        
+
+
         conn.close()
         return JsonResponse(result)
     else:
@@ -714,7 +714,7 @@ def webservice_weiqishofuei_chaxun(requset):
         except:
             pass
         conn.close()
-        
+
         if len(cheliangxinxi) == 0:
             return JsonResponse({'is_tixing':'yes','tixingxinxi':u'没有找到车辆的年检信息，是否继续？'})
         if cheliangxinxi.get('yingyunleibie_id') == 'D':
@@ -723,7 +723,7 @@ def webservice_weiqishofuei_chaxun(requset):
         if cheliangxinxi.get('cheliangleibie_id') == 'N11':
             result = {'is_tixing': 'no'}
             return JsonResponse(result)
-        
+
         #查询尾气收费
         jieguo = {}
         conn1 = pymssql.connect('15.29.32.61', 'sa', 'svrcomputer', 'hbjcdb')
@@ -2468,8 +2468,45 @@ def getcarimg(request):
             else:
                 return JsonResponse({'chenggong':False,'cuowu':u'数据值非法'})
 
+def saveweiqicarinfo(request):
+    if request.method == 'POST':
+        try:
+            jieshou_json = json.loads(request.body)
+        except:
+            return JsonResponse({'chenggong': False,'cuowu':u'数据格式不正确'})
+        else:
+            hphm = jieshou_json.get('hphm')
+            hpzl = jieshou_json.get('hpzl')
+            carinfostr = jieshou_json.get('carinfostr')
+            jylsh = jieshou_json.get('jylsh')
+            if hphm and hpzl and carinfostr and jylsh:
+                return JsonResponse({'data':Dx_WeiQi_CarInfo().saveorupdate(jylsh,hphm,hpzl,carinfostr).get('caozuo'),
+                                     'chenggong':True})
+            else:
+                return JsonResponse({'chenggong':False,'cuowu':u'数据字段值非法'})
 
-
+def getweiqicarinfo(request):
+    if request.method == 'POST':
+        try:
+            jieshou_json = json.loads(request.body)
+        except:
+            return JsonResponse({'chenggong': False,'cuowu':u'数据格式不正确'})
+        else:
+            hphm = jieshou_json.get('hphm')
+            hpzl = jieshou_json.get('hpzl')
+            jylsh = jieshou_json.get('jylsh')
+            if hphm and hpzl:
+                cf = Dx_WeiQi_CarInfo().getcarinfo(hphm,hpzl)
+                if cf.get('chenggong'):
+                    return JsonResponse({'chenggong':True,'data':cf.get('data')})
+                else:
+                    return JsonResponse({'chenggong':False,'cuowu':cf.get('cuowu')})
+            elif jylsh:
+                cfj = Dx_WeiQi_CarInfo().getcarinfobyjylsh(jylsh)
+                if cfj.get('chenggong'):
+                    return JsonResponse({'chenggong': True, 'data': cfj.get('data')})
+                else:
+                    return JsonResponse({'chenggong':False,'cuowu':cfj.get('cuowu')})
 """
 部署到0。3其他机器需注释掉
 

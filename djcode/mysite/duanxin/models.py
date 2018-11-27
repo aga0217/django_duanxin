@@ -796,7 +796,40 @@ class Dx_CarImg(models.Model):
 
 
 
+class Dx_WeiQi_CarInfo(models.Model):
+    jylsh = models.CharField(max_length=19,verbose_name=u'检验流水号')
+    hphm = models.CharField(max_length=10, verbose_name=u'车牌号码')
+    hpzl = models.CharField(max_length=2, verbose_name=u'号牌种类id')
+    carinfostr = models.TextField(verbose_name=u'车辆信息字符串')
 
+    def saveorupdate(self,jylsh,hphm,hpzl,carinfostr):#判断传入的数据是否需要保存还是更新
+        try:
+            qs = Dx_WeiQi_CarInfo.objects.get(hphm=hphm,hpzl=hpzl)
+        except:
+            q = Dx_WeiQi_CarInfo(jylsh=jylsh,hphm=hphm,hpzl=hpzl,carinfostr=carinfostr)#不存在则增加
+            q.save()
+            return {'caozuo':'save'}
+        else:
+            id = qs.id
+            qu = Dx_WeiQi_CarInfo.objects.filter(id=id)
+            qu.update(carinfostr=carinfostr,jylsh=jylsh)
+            return {'caozuo':'update'}
+
+    def getcarinfo(self,hphm,hpzl):
+        try:
+            qs = Dx_WeiQi_CarInfo.objects.get(hphm=hphm,hpzl=hpzl)
+        except:
+            return {'chenggong':False,'cuowu':u'没有找到车辆信息'}
+        else:
+            return {'chenggong':True,'data':qs.carinfostr}
+
+    def getcarinfobyjylsh(self,jylsh):
+        try:
+            qs = Dx_WeiQi_CarInfo.objects.get(jylsh=jylsh)
+        except:
+            return {'chenggong':False,'cuowu':u'没有找到车辆信息'}
+        else:
+            return {'chenggong':True,'data':qs.carinfostr}
 """        
     def handle(self, *args, **options):
         q = DX_CeleryLog(comname='fasong_yibutest',starttime=datetime.datetime.now())
